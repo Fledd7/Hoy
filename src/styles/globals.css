@@ -1,0 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    background-color: #FAF7F2;
+  }
+
+  body {
+    background-color: #FAF7F2;
+    color: #1A1A1A;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer utilities {
+  .tap-scale {
+    transition: transform 200ms ease-out;
+  }
+
+  .tap-scale:active {
+    transform: scale(0.97);
+  }
+
+  .fade-in {
+    animation: fadeIn 200ms ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+}
