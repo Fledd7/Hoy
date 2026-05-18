@@ -59,7 +59,7 @@ export default function Heute() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
+    <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#FAF7F2] to-[#F5F1EB]">
       <div className="w-full max-w-content mx-auto px-5 pt-5 pb-8 flex flex-col h-screen">
         <header className="flex items-center justify-between mb-8">
           <span className="text-xl font-semibold text-text">Hoy</span>
@@ -72,13 +72,14 @@ export default function Heute() {
           </div>
           <ReturnBanner visible={showBanner} />
           <div className="flex flex-col gap-3">
-            {ENERGIE_BUTTONS.map((btn) => (
-              <EnergyButton
-                key={btn.mode}
-                label={btn.label}
-                sublabel={btn.sublabel}
-                onClick={() => handleEnergySelect(btn.mode)}
-              />
+            {ENERGIE_BUTTONS.map((btn, idx) => (
+              <div key={btn.mode} className="enter-up" style={{ animationDelay: `${idx * 80}ms` }}>
+                <EnergyButton
+                  label={btn.label}
+                  sublabel={btn.sublabel}
+                  onClick={() => handleEnergySelect(btn.mode)}
+                />
+              </div>
             ))}
           </div>
         </main>

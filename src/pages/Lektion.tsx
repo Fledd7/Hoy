@@ -47,7 +47,7 @@ const BACK_BTN =
   'text-muted text-sm tap-scale self-start mb-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded'
 
 const PAGE_WRAP =
-  'flex flex-col min-h-screen bg-background max-w-content mx-auto px-5 pt-5 pb-10'
+  'flex flex-col min-h-screen bg-gradient-to-b from-[#FAF7F2] to-[#F5F1EB] max-w-content mx-auto px-5 pt-5 pb-10'
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -128,7 +128,7 @@ export default function Lektion() {
     const keyword = lesson ? extractKeyword(lesson) : null
 
     return (
-      <div className={`flex flex-col min-h-screen bg-[#FAF7F2] items-center justify-center px-8 gap-3 ${fadingOut ? 'fade-out' : 'fade-in'}`}>
+      <div className={`flex flex-col min-h-screen bg-gradient-to-b from-[#FAF7F2] to-[#F5F1EB] items-center justify-center px-8 gap-3 ${fadingOut ? 'fade-out' : 'fade-in'}`}>
         {keyword?.es && (
           <p className="font-serif text-[48px] font-semibold text-text text-center leading-tight">
             {keyword.es}

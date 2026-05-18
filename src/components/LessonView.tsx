@@ -16,7 +16,7 @@ export default function LessonView({ lesson, onFinish }: LessonViewProps) {
   return <ErzaehlView lesson={lesson} onFinish={onFinish} />
 }
 
-// ─── Inline vocab helpers for TiredView ──────────────────────────────────────
+// ─── Inline vocab helpers ────────────────────────────────────────────────────
 
 interface Segment {
   text: string
@@ -59,38 +59,46 @@ function truncateToTwoSentences(text: string): string {
   return match ? match[0] : text
 }
 
-function InlineVocabWord({
-  text,
-  de,
-  revealed,
-  onTap,
-}: {
-  text: string
-  de: string
-  revealed: boolean
-  onTap: () => void
-}) {
+// ─── Shared sub-components ───────────────────────────────────────────────────
+
+function TranslationToggle({ text, show, onToggle }: { text: string; show: boolean; onToggle: () => void }) {
   return (
-    <span className="inline-flex flex-col items-start align-baseline">
+    <>
       <button
-        onClick={onTap}
-        className="text-text bg-[#F3E8E5] rounded-[4px] px-1 tap-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        onClick={onToggle}
+        className="mt-3 text-[14px] text-muted underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
       >
-        {text}
+        {show ? 'Übersetzung verbergen' : 'Ich brauche die Übersetzung'}
       </button>
-      {revealed && (
-        <span className="bg-white border border-[#E0DBD6] rounded-[8px] px-2 py-1 text-[13px] text-text mt-1 leading-snug">
-          {de}
-        </span>
+      {show && (
+        <p className="text-muted text-base leading-relaxed mt-2 fade-in">{text}</p>
       )}
-    </span>
+    </>
+  )
+}
+
+// Chevron toggle button used in per-line collapsible rows
+function LineChevron({ open, onToggle, label }: { open: boolean; onToggle: () => void; label: string }) {
+  return (
+    <button
+      onClick={onToggle}
+      aria-label={label}
+      className="flex-shrink-0 w-6 h-6 flex items-center justify-center text-muted tap-scale focus-visible:outline-none"
+    >
+      <span
+        className="text-[11px] inline-block transition-transform duration-200"
+        style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}
+      >
+        ▼
+      </span>
+    </button>
   )
 }
 
 // ─── Views ───────────────────────────────────────────────────────────────────
 
 function TiredView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'muede' }>; onFinish: () => void }) {
-  const [revealed, setRevealed] = useState<Set<string>>(new Set())
+  const [showTranslation, setShowTranslation] = useState(false)
   const truncatedText = truncateToTwoSentences(lesson.text)
   const truncatedTranslation = truncateToTwoSentences(lesson.translation)
   const segments = splitTextWithVocab(truncatedText, lesson.vocab)
@@ -105,28 +113,32 @@ function TiredView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'mued
       <div>
         <h2 className="text-[20px] text-text font-semibold">Heute ganz leicht</h2>
         <p className="text-[14px] text-muted mt-1">
-          Lies nur den kleinen Text. Tippe auf markierte Wörter, wenn du magst.
+          Lies den Text. Tippe auf markierte Wörter für die Übersetzung.
         </p>
       </div>
-      <Card>
+      <Card accent className="enter-up" style={{ animationDelay: '40ms' }}>
         <div className="text-lg leading-relaxed text-text font-medium">
           {segments.map((seg, i) =>
             seg.de && seg.key ? (
-              <InlineVocabWord
-                key={i}
-                text={seg.text}
-                de={seg.de}
-                revealed={revealed.has(seg.key)}
-                onTap={() => setRevealed(prev => new Set([...prev, seg.key!]))}
-              />
+              <VocabTap key={i} es={seg.text} de={seg.de} />
             ) : (
               <span key={i}>{seg.text}</span>
             )
           )}
         </div>
-        <p className="text-muted text-base leading-relaxed mt-4">{truncatedTranslation}</p>
+        <TranslationToggle
+          text={truncatedTranslation}
+          show={showTranslation}
+          onToggle={() => setShowTranslation(s => !s)}
+        />
       </Card>
-      <Button variant="primary" fullWidth onClick={handleFinish}>
+      <Button
+        variant="primary"
+        fullWidth
+        onClick={handleFinish}
+        className="enter-up"
+        style={{ animationDelay: '120ms' }}
+      >
         Reicht für heute
       </Button>
     </div>
@@ -136,6 +148,7 @@ function TiredView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'mued
 function OkayView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'okay' }>; onFinish: () => void }) {
   const [answers, setAnswers] = useState<Record<number, number>>({})
   const [checked, setChecked] = useState(false)
+  const [showTranslation, setShowTranslation] = useState(false)
 
   const allAnswered = lesson.questions.every((_, i) => answers[i] !== undefined)
 
@@ -150,9 +163,13 @@ function OkayView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'okay'
 
   return (
     <div className="fade-in flex flex-col gap-6">
-      <Card>
+      <Card accent className="enter-up" style={{ animationDelay: '40ms' }}>
         <p className="text-lg leading-relaxed text-text font-medium">{lesson.text}</p>
-        <p className="text-muted text-base leading-relaxed mt-4">{lesson.translation}</p>
+        <TranslationToggle
+          text={lesson.translation}
+          show={showTranslation}
+          onToggle={() => setShowTranslation(s => !s)}
+        />
       </Card>
       <div className="flex flex-col gap-5">
         {lesson.questions.map((q, qi) => (
@@ -166,6 +183,7 @@ function OkayView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'okay'
               navigator.vibrate?.(10)
               setAnswers((a) => ({ ...a, [qi]: idx }))
             }}
+            style={{ animationDelay: `${(qi + 1) * 80}ms` }}
           />
         ))}
       </div>
@@ -187,39 +205,95 @@ function QuizCard({
   selected,
   checked,
   onSelect,
+  style,
 }: {
   question: QuizQuestion
   selected: number | undefined
   checked: boolean
   onSelect: (idx: number) => void
+  style?: React.CSSProperties
 }) {
   return (
-    <Card>
+    <Card className="enter-up" style={style}>
       <p className="text-base font-medium text-text mb-3">{question.question}</p>
       <div className="flex flex-col gap-2">
         {question.options.map((opt, idx) => {
-          let style = 'border border-[#E0DDD8] text-text'
+          let optStyle = 'border border-[#E0DDD8] text-text'
           let extraClass = ''
           if (checked) {
             if (idx === question.correctIndex) {
-              style = 'border-2 border-accent text-accent bg-[#FBF0EE]'
+              optStyle = 'border-2 border-accent text-accent bg-[#FBF0EE]'
               extraClass = 'correct-glow'
             } else if (idx === selected) {
-              style = 'border border-[#E0DDD8] text-muted line-through'
+              optStyle = 'border border-[#E0DDD8] text-muted line-through'
             }
           } else if (idx === selected) {
-            style = 'border-2 border-accent text-accent bg-[#FBF0EE]'
+            optStyle = 'border-2 border-accent text-accent bg-[#FBF0EE]'
           }
           return (
             <button
               key={idx}
               onClick={() => onSelect(idx)}
-              className={`w-full text-left px-4 py-3 rounded-btn text-sm tap-scale ${style} ${extraClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
+              className={`w-full text-left px-4 py-3 rounded-btn text-sm tap-scale ${optStyle} ${extraClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
             >
               {opt}
             </button>
           )
         })}
+      </div>
+    </Card>
+  )
+}
+
+// ─── Fit Dialog Card with per-line collapsible translations ──────────────────
+
+function FitDialogCard({ dialog }: { dialog: { speaker: string; es: string; de: string }[] }) {
+  const [revealed, setRevealed] = useState<Set<number>>(new Set())
+
+  const allVisible = revealed.size === dialog.length
+
+  function toggleLine(i: number) {
+    setRevealed(prev => {
+      const next = new Set(prev)
+      if (next.has(i)) next.delete(i)
+      else next.add(i)
+      return next
+    })
+  }
+
+  function toggleAll() {
+    setRevealed(allVisible ? new Set() : new Set(dialog.map((_, i) => i)))
+  }
+
+  return (
+    <Card accent className="enter-up" style={{ animationDelay: '40ms' }}>
+      <div className="flex justify-end mb-3">
+        <button
+          onClick={toggleAll}
+          className="text-[12px] text-muted underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+        >
+          {allVisible ? 'Übersetzungen verbergen' : 'Alle Übersetzungen zeigen'}
+        </button>
+      </div>
+      <div className="flex flex-col gap-4">
+        {dialog.map((line, i) => (
+          <div key={i}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <span className="text-xs font-semibold text-accent uppercase tracking-wide">{line.speaker}</span>
+                <p className="text-base text-text mt-0.5">{line.es}</p>
+              </div>
+              <LineChevron
+                open={revealed.has(i)}
+                onToggle={() => toggleLine(i)}
+                label={revealed.has(i) ? 'Übersetzung verbergen' : 'Übersetzung zeigen'}
+              />
+            </div>
+            {revealed.has(i) && (
+              <p className="text-sm text-muted mt-1 fade-in">{line.de}</p>
+            )}
+          </div>
+        ))}
       </div>
     </Card>
   )
@@ -317,7 +391,7 @@ function FitVocabSwipe({ vocab, onFinish }: { vocab: { es: string; de: string }[
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
           onClick={handleTap}
-          className="bg-white border border-[#E0DDD8] rounded-card px-6 py-10 min-h-[200px] flex flex-col items-center justify-center cursor-pointer select-none fade-in"
+          className="bg-white border border-[#E2D7C8]/50 rounded-card px-6 py-10 min-h-[200px] flex flex-col items-center justify-center cursor-pointer select-none shadow-card fade-in"
         >
           <p className="text-2xl font-semibold text-text text-center">{card.es}</p>
           {revealed ? (
@@ -366,18 +440,14 @@ function FitView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'fit' }
             <span className="text-xs font-semibold text-accent uppercase tracking-wide">Schritt 1 von 2</span>
             <span className="text-xs text-muted">Dialog</span>
           </div>
-          <Card>
-            <div className="flex flex-col gap-4">
-              {lesson.dialog.map((line, i) => (
-                <div key={i}>
-                  <span className="text-xs font-semibold text-accent uppercase tracking-wide">{line.speaker}</span>
-                  <p className="text-base text-text mt-0.5">{line.es}</p>
-                  <p className="text-sm text-muted mt-0.5">{line.de}</p>
-                </div>
-              ))}
-            </div>
-          </Card>
-          <Button variant="primary" fullWidth onClick={() => setStep(2)}>
+          <FitDialogCard dialog={lesson.dialog} />
+          <Button
+            variant="primary"
+            fullWidth
+            onClick={() => setStep(2)}
+            className="enter-up"
+            style={{ animationDelay: '120ms' }}
+          >
             Weiter zu den Vokabeln
           </Button>
         </>
@@ -395,6 +465,19 @@ function FitView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'fit' }
 }
 
 function ErzaehlView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'erzaehl' }>; onFinish: () => void }) {
+  const [revealed, setRevealed] = useState<Set<number>>(new Set())
+
+  const allVisible = revealed.size === lesson.saetze.length
+
+  function toggleLine(i: number) {
+    setRevealed(prev => {
+      const next = new Set(prev)
+      if (next.has(i)) next.delete(i)
+      else next.add(i)
+      return next
+    })
+  }
+
   function handleFinish() {
     navigator.vibrate?.(10)
     onFinish()
@@ -402,23 +485,40 @@ function ErzaehlView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'er
 
   return (
     <div className="fade-in flex flex-col gap-6">
-      <Card>
+      <Card accent className="enter-up" style={{ animationDelay: '40ms' }}>
+        <div className="flex justify-end mb-3">
+          <button
+            onClick={() => setRevealed(allVisible ? new Set() : new Set(lesson.saetze.map((_, i) => i)))}
+            className="text-[12px] text-muted underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+          >
+            {allVisible ? 'Übersetzungen verbergen' : 'Alle Übersetzungen zeigen'}
+          </button>
+        </div>
         <div className="flex flex-col gap-4">
           {lesson.saetze.map((s, i) => (
             <div key={i}>
-              <p className="text-base text-text font-medium">{s.es}</p>
-              <p className="text-sm text-muted mt-0.5">{s.de}</p>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-base text-text font-medium flex-1 min-w-0">{s.es}</p>
+                <LineChevron
+                  open={revealed.has(i)}
+                  onToggle={() => toggleLine(i)}
+                  label={revealed.has(i) ? 'Übersetzung verbergen' : 'Übersetzung zeigen'}
+                />
+              </div>
+              {revealed.has(i) && (
+                <p className="text-sm text-muted mt-0.5 fade-in">{s.de}</p>
+              )}
             </div>
           ))}
         </div>
       </Card>
-      <p className="text-xs text-muted">Tippe auf eine Vokabel zum Aufdecken</p>
-      <div className="flex flex-col gap-3">
-        {lesson.vocab.map((v) => (
-          <VocabTap key={v.es} es={v.es} de={v.de} />
-        ))}
-      </div>
-      <Button variant="primary" fullWidth onClick={handleFinish}>
+      <Button
+        variant="primary"
+        fullWidth
+        onClick={handleFinish}
+        className="enter-up"
+        style={{ animationDelay: '120ms' }}
+      >
         Fertig
       </Button>
     </div>

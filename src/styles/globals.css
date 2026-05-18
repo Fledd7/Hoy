@@ -31,6 +31,15 @@
     transform: scale(0.97);
   }
 
+  .tap-lift {
+    transition: transform 200ms ease-out, box-shadow 200ms ease-out;
+  }
+
+  .tap-lift:active {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(26,26,26,0.12), 0 2px 8px rgba(26,26,26,0.06);
+  }
+
   .fade-in {
     animation: fadeIn 200ms ease-out;
   }
@@ -45,6 +54,10 @@
 
   .correct-glow {
     animation: correctGlow 400ms ease-out forwards;
+  }
+
+  .enter-up {
+    animation: enterUp 300ms ease-out both;
   }
 
   @keyframes fadeIn {
@@ -67,5 +80,10 @@
     0%   { box-shadow: 0 0 0 0px rgba(194,85,61,0.3); }
     30%  { box-shadow: 0 0 0 3px rgba(194,85,61,0.3); }
     100% { box-shadow: 0 0 0 0px rgba(194,85,61,0.3); }
+  }
+
+  @keyframes enterUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
 }

@@ -65,7 +65,7 @@ export default function Profil() {
   const canSave = themen.length === REQUIRED_THEMEN_COUNT
 
   return (
-    <div className="flex flex-col min-h-screen bg-background max-w-content mx-auto px-5 pt-5 pb-16">
+    <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#FAF7F2] to-[#F5F1EB] max-w-content mx-auto px-5 pt-5 pb-16">
       <button
         onClick={() => navigate('/heute')}
         aria-label="Zurück zur Hauptseite"
@@ -150,7 +150,7 @@ export default function Profil() {
         >
           Alle Daten zurücksetzen
         </Button>
-        <p className="text-center text-[12px] text-[#9B9B9B] mt-8">Hoy v0.4</p>
+        <p className="text-center text-[12px] text-[#9B9B9B] mt-8">Hoy v0.5</p>
       </div>
     </div>
   )
