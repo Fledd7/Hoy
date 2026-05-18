@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { Lesson, QuizQuestion } from '../lib/types'
 import VocabTap from './VocabTap'
 import Button from './Button'
@@ -95,6 +95,11 @@ function TiredView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'mued
   const truncatedTranslation = truncateToTwoSentences(lesson.translation)
   const segments = splitTextWithVocab(truncatedText, lesson.vocab)
 
+  function handleFinish() {
+    navigator.vibrate?.(10)
+    onFinish()
+  }
+
   return (
     <div className="fade-in flex flex-col gap-6">
       <div>
@@ -121,7 +126,7 @@ function TiredView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'mued
         </div>
         <p className="text-muted text-base leading-relaxed mt-4">{truncatedTranslation}</p>
       </Card>
-      <Button variant="primary" fullWidth onClick={onFinish}>
+      <Button variant="primary" fullWidth onClick={handleFinish}>
         Reicht für heute
       </Button>
     </div>
@@ -138,6 +143,11 @@ function OkayView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'okay'
     if (allAnswered) setChecked(true)
   }
 
+  function handleFinish() {
+    navigator.vibrate?.(10)
+    onFinish()
+  }
+
   return (
     <div className="fade-in flex flex-col gap-6">
       <Card>
@@ -151,7 +161,11 @@ function OkayView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'okay'
             question={q}
             selected={answers[qi]}
             checked={checked}
-            onSelect={(idx) => !checked && setAnswers((a) => ({ ...a, [qi]: idx }))}
+            onSelect={(idx) => {
+              if (checked) return
+              navigator.vibrate?.(10)
+              setAnswers((a) => ({ ...a, [qi]: idx }))
+            }}
           />
         ))}
       </div>
@@ -160,7 +174,7 @@ function OkayView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'okay'
           Auswerten
         </Button>
       ) : (
-        <Button variant="primary" fullWidth onClick={onFinish}>
+        <Button variant="primary" fullWidth onClick={handleFinish}>
           Fertig
         </Button>
       )}
@@ -185,9 +199,14 @@ function QuizCard({
       <div className="flex flex-col gap-2">
         {question.options.map((opt, idx) => {
           let style = 'border border-[#E0DDD8] text-text'
+          let extraClass = ''
           if (checked) {
-            if (idx === question.correctIndex) style = 'border-2 border-accent text-accent bg-[#FBF0EE]'
-            else if (idx === selected) style = 'border border-[#E0DDD8] text-muted line-through'
+            if (idx === question.correctIndex) {
+              style = 'border-2 border-accent text-accent bg-[#FBF0EE]'
+              extraClass = 'correct-glow'
+            } else if (idx === selected) {
+              style = 'border border-[#E0DDD8] text-muted line-through'
+            }
           } else if (idx === selected) {
             style = 'border-2 border-accent text-accent bg-[#FBF0EE]'
           }
@@ -195,7 +214,7 @@ function QuizCard({
             <button
               key={idx}
               onClick={() => onSelect(idx)}
-              className={`w-full text-left px-4 py-3 rounded-btn text-sm tap-scale ${style} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
+              className={`w-full text-left px-4 py-3 rounded-btn text-sm tap-scale ${style} ${extraClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
             >
               {opt}
             </button>
@@ -203,6 +222,136 @@ function QuizCard({
         })}
       </div>
     </Card>
+  )
+}
+
+// ─── Fit Vocab Swipe ──────────────────────────────────────────────────────────
+
+function FitVocabSwipe({ vocab, onFinish }: { vocab: { es: string; de: string }[]; onFinish: () => void }) {
+  const [index, setIndex] = useState(0)
+  const [revealed, setRevealed] = useState(false)
+  const [offset, setOffset] = useState(0)
+  const [animDir, setAnimDir] = useState<'left' | 'right' | null>(null)
+
+  const startXRef = useRef<number | null>(null)
+  const dragXRef = useRef(0)
+  const hasDraggedRef = useRef(false)
+
+  const done = index >= vocab.length
+
+  function advance(dir: 'left' | 'right') {
+    setAnimDir(dir)
+    setTimeout(() => {
+      setIndex(i => i + 1)
+      setRevealed(false)
+      setOffset(0)
+      setAnimDir(null)
+    }, 250)
+  }
+
+  function handleTouchStart(e: React.TouchEvent) {
+    startXRef.current = e.touches[0].clientX
+    dragXRef.current = 0
+    hasDraggedRef.current = false
+  }
+
+  function handleTouchMove(e: React.TouchEvent) {
+    if (startXRef.current === null || animDir !== null) return
+    const dx = e.touches[0].clientX - startXRef.current
+    dragXRef.current = dx
+    if (Math.abs(dx) > 8) hasDraggedRef.current = true
+    setOffset(dx)
+  }
+
+  function handleTouchEnd() {
+    if (animDir !== null) return
+    if (hasDraggedRef.current && Math.abs(dragXRef.current) > 60) {
+      advance(dragXRef.current < 0 ? 'left' : 'right')
+    } else {
+      setOffset(0)
+    }
+    startXRef.current = null
+  }
+
+  function handleTap() {
+    if (hasDraggedRef.current) { hasDraggedRef.current = false; return }
+    if (!revealed) {
+      setRevealed(true)
+      navigator.vibrate?.(8)
+    }
+  }
+
+  if (done) {
+    return (
+      <div className="flex flex-col gap-3 fade-in">
+        <p className="text-xs text-muted text-center">Alle Vokabeln gesehen</p>
+        <Button variant="primary" fullWidth onClick={() => { navigator.vibrate?.(10); onFinish() }}>
+          Fertig
+        </Button>
+      </div>
+    )
+  }
+
+  const card = vocab[index]
+
+  let cardTransform: string
+  let cardTransition: string
+  if (animDir !== null) {
+    cardTransform = `translateX(${animDir === 'left' ? '-110%' : '110%'})`
+    cardTransition = 'transform 250ms ease-out'
+  } else if (hasDraggedRef.current || offset !== 0) {
+    cardTransform = `translateX(${offset}px)`
+    cardTransition = 'none'
+  } else {
+    cardTransform = 'translateX(0)'
+    cardTransition = 'transform 150ms ease-out'
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="overflow-hidden rounded-card">
+        <div
+          key={index}
+          style={{ transform: cardTransform, transition: cardTransition }}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onClick={handleTap}
+          className="bg-white border border-[#E0DDD8] rounded-card px-6 py-10 min-h-[200px] flex flex-col items-center justify-center cursor-pointer select-none fade-in"
+        >
+          <p className="text-2xl font-semibold text-text text-center">{card.es}</p>
+          {revealed ? (
+            <p className="text-base text-muted mt-3 text-center fade-in">{card.de}</p>
+          ) : (
+            <p className="text-xs text-muted mt-4">Tippe zum Aufdecken</p>
+          )}
+        </div>
+      </div>
+
+      <div className="flex justify-center gap-1.5 items-center">
+        {vocab.map((_, i) => (
+          <span
+            key={i}
+            className={`rounded-full transition-all duration-200 ${
+              i === index ? 'w-5 h-2 bg-accent' : i < index ? 'w-2 h-2 bg-[#C2553D]/30' : 'w-2 h-2 bg-[#E0DDD8]'
+            }`}
+          />
+        ))}
+      </div>
+
+      {revealed && (
+        <Button
+          variant={index === vocab.length - 1 ? 'primary' : 'secondary'}
+          fullWidth
+          onClick={() => {
+            if (index === vocab.length - 1) { navigator.vibrate?.(10); onFinish() }
+            else advance('left')
+          }}
+        >
+          {index === vocab.length - 1 ? 'Fertig' : 'Weiter →'}
+        </Button>
+      )}
+    </div>
   )
 }
 
@@ -238,15 +387,7 @@ function FitView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'fit' }
             <span className="text-xs font-semibold text-accent uppercase tracking-wide">Schritt 2 von 2</span>
             <span className="text-xs text-muted">Vokabeln</span>
           </div>
-          <p className="text-xs text-muted -mt-3">Tippe auf eine Vokabel zum Aufdecken</p>
-          <div className="flex flex-col gap-3">
-            {lesson.vocab.map((v) => (
-              <VocabTap key={v.es} es={v.es} de={v.de} />
-            ))}
-          </div>
-          <Button variant="primary" fullWidth onClick={onFinish}>
-            Fertig
-          </Button>
+          <FitVocabSwipe vocab={lesson.vocab} onFinish={onFinish} />
         </>
       )}
     </div>
@@ -254,6 +395,11 @@ function FitView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'fit' }
 }
 
 function ErzaehlView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'erzaehl' }>; onFinish: () => void }) {
+  function handleFinish() {
+    navigator.vibrate?.(10)
+    onFinish()
+  }
+
   return (
     <div className="fade-in flex flex-col gap-6">
       <Card>
@@ -272,7 +418,7 @@ function ErzaehlView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'er
           <VocabTap key={v.es} es={v.es} de={v.de} />
         ))}
       </div>
-      <Button variant="primary" fullWidth onClick={onFinish}>
+      <Button variant="primary" fullWidth onClick={handleFinish}>
         Fertig
       </Button>
     </div>

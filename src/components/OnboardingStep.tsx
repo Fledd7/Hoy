@@ -8,7 +8,7 @@ export default function OnboardingStep({ children, title, subtitle }: Onboarding
   return (
     <div className="fade-in flex flex-col min-h-screen bg-background px-6 pt-16 pb-10 max-w-content mx-auto w-full">
       {title && (
-        <h1 className="text-2xl font-semibold text-text mb-2 leading-snug">{title}</h1>
+        <h1 className="font-serif text-[32px] font-semibold text-text mb-2 leading-tight">{title}</h1>
       )}
       {subtitle && (
         <p className="text-muted text-base mb-8">{subtitle}</p>

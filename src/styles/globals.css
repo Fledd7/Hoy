@@ -11,8 +11,10 @@
     background-color: #FAF7F2;
     color: #1A1A1A;
     font-family: 'Inter', system-ui, sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    line-height: 1.5;
   }
 
   * {
@@ -22,7 +24,7 @@
 
 @layer utilities {
   .tap-scale {
-    transition: transform 200ms ease-out;
+    transition: transform 100ms ease-out;
   }
 
   .tap-scale:active {
@@ -33,8 +35,37 @@
     animation: fadeIn 200ms ease-out;
   }
 
+  .fade-out {
+    animation: fadeOut 200ms ease-out forwards;
+  }
+
+  .vocab-reveal {
+    animation: vocabReveal 150ms ease-out;
+  }
+
+  .correct-glow {
+    animation: correctGlow 400ms ease-out forwards;
+  }
+
   @keyframes fadeIn {
     from { opacity: 0; }
-    to { opacity: 1; }
+    to   { opacity: 1; }
+  }
+
+  @keyframes fadeOut {
+    from { opacity: 1; }
+    to   { opacity: 0; }
+  }
+
+  @keyframes vocabReveal {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+
+  @keyframes correctGlow {
+    0%   { box-shadow: 0 0 0 0px rgba(194,85,61,0.3); }
+    30%  { box-shadow: 0 0 0 3px rgba(194,85,61,0.3); }
+    100% { box-shadow: 0 0 0 0px rgba(194,85,61,0.3); }
   }
 }

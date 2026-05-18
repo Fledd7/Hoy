@@ -2,17 +2,40 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import LessonView from '../components/LessonView'
 import Button from '../components/Button'
-import { ABSCHLUSS_SAETZE } from '../lib/config'
 import { getUser } from '../lib/storage'
+import { addSeenVocab } from '../lib/storage'
 import { fetchLektion } from '../lib/api'
 import type { EnergyMode, Lesson } from '../lib/types'
 
-function getDailyIndex(arr: unknown[]): number {
-  const today = new Date()
-  const seed =
-    today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate()
-  return seed % arr.length
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const ABSCHLUSS_ES = [
+  'Hasta mañana.',
+  'Hasta luego.',
+  'Buen trabajo.',
+  'Eso es todo por hoy.',
+  'Nos vemos.',
+]
+
+function extractVocab(lesson: Lesson): { es: string; de: string }[] {
+  if (lesson.mode === 'muede') return lesson.vocab
+  if (lesson.mode === 'okay') return []
+  return lesson.vocab
 }
+
+function extractKeyword(lesson: Lesson): { es: string; de: string } | null {
+  if (lesson.mode === 'muede') return lesson.vocab[0] ?? null
+  if (lesson.mode === 'fit')   return lesson.vocab[0] ?? null
+  if (lesson.mode === 'erzaehl') return lesson.vocab[0] ?? null
+  // okay: find first non-trivial word from text
+  const stop = new Set(['el','la','los','las','un','una','en','de','a','y','que',
+    'se','su','con','por','para','es','ha','al','del','su','lo'])
+  const words = lesson.text.split(/[\s,.:;!?'"()]+/)
+  const word = words.find(w => w.length > 4 && !stop.has(w.toLowerCase()))
+  return word ? { es: word, de: '' } : null
+}
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 type PageState =
   | { kind: 'erzaehl_input' }
@@ -26,10 +49,13 @@ const BACK_BTN =
 const PAGE_WRAP =
   'flex flex-col min-h-screen bg-background max-w-content mx-auto px-5 pt-5 pb-10'
 
+// ─── Component ───────────────────────────────────────────────────────────────
+
 export default function Lektion() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [abschluss, setAbschluss] = useState(false)
+  const [fadingOut, setFadingOut] = useState(false)
   const [erzaehlInput, setErzaehlInput] = useState('')
 
   const rawMode = searchParams.get('mode')
@@ -42,7 +68,10 @@ export default function Lektion() {
     mode === 'erzaehl' ? { kind: 'erzaehl_input' } : { kind: 'loading' },
   )
 
-  const abschlussSatz = ABSCHLUSS_SAETZE[getDailyIndex(ABSCHLUSS_SAETZE)]
+  // Stable random sign-off picked once on mount
+  const [signOff] = useState(
+    () => ABSCHLUSS_ES[Math.floor(Math.random() * ABSCHLUSS_ES.length)],
+  )
 
   const loadLektion = useCallback(
     async (m: EnergyMode, userInput?: string) => {
@@ -68,11 +97,20 @@ export default function Lektion() {
     void loadLektion(mode)
   }, [mode, loadLektion])
 
+  // Abschluss timing: 1800ms total, fade-out starts at 1600ms
+  useEffect(() => {
+    if (!abschluss) return
+    const t1 = setTimeout(() => setFadingOut(true), 1600)
+    const t2 = setTimeout(() => navigate('/heute', { replace: true }), 1800)
+    return () => { clearTimeout(t1); clearTimeout(t2) }
+  }, [abschluss, navigate])
+
   const handleFinish = useCallback(() => {
+    if (pageState.kind === 'ready') {
+      addSeenVocab(extractVocab(pageState.lesson))
+    }
     setAbschluss(true)
-    const duration = mode === 'muede' ? 1200 : 800
-    setTimeout(() => navigate('/heute', { replace: true }), duration)
-  }, [navigate, mode])
+  }, [pageState])
 
   // ─── invalid mode ──────────────────────────────────────────────────────────
   if (!mode) {
@@ -86,13 +124,20 @@ export default function Lektion() {
 
   // ─── abschluss screen ──────────────────────────────────────────────────────
   if (abschluss) {
-    const isMuede = mode === 'muede'
-    const text = isMuede ? 'Gut. Mehr muss heute nicht sein.' : abschlussSatz
+    const lesson = pageState.kind === 'ready' ? pageState.lesson : null
+    const keyword = lesson ? extractKeyword(lesson) : null
+
     return (
-      <div className="flex flex-col min-h-screen bg-background items-center justify-center fade-in px-6">
-        <p className={`text-center text-text ${isMuede ? 'text-[18px]' : 'text-2xl font-semibold'}`}>
-          {text}
-        </p>
+      <div className={`flex flex-col min-h-screen bg-[#FAF7F2] items-center justify-center px-8 gap-3 ${fadingOut ? 'fade-out' : 'fade-in'}`}>
+        {keyword?.es && (
+          <p className="font-serif text-[48px] font-semibold text-text text-center leading-tight">
+            {keyword.es}
+          </p>
+        )}
+        {keyword?.de && (
+          <p className="text-[18px] text-muted text-center">{keyword.de}</p>
+        )}
+        <p className="absolute bottom-10 text-sm text-muted">{signOff}</p>
       </div>
     )
   }
