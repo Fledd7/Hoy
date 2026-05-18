@@ -10,7 +10,7 @@ const ENERGIE_BUTTONS: { mode: EnergyMode; label: string; sublabel: string }[] =
   { mode: 'muede', label: 'Müde', sublabel: 'Kurzer Lese-Snack, 2 Minuten' },
   { mode: 'okay', label: 'Okay', sublabel: 'Lektion mit Verständnisfragen' },
   { mode: 'fit', label: 'Fit', sublabel: 'Dialog + Vokabeln, zwei Teile' },
-  { mode: 'erzaehl', label: 'Erzähl mir was', sublabel: 'Bald verfügbar' },
+  { mode: 'erzaehl', label: 'Erzähl mir was', sublabel: 'Dein Tag auf Spanisch' },
 ]
 
 export default function Heute() {

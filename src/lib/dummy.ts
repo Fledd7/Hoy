@@ -1,4 +1,4 @@
-import type { TiredLesson, OkayLesson, FitLesson } from './types';
+import type { TiredLesson, OkayLesson, FitLesson, ErzaehlLesson } from './types';
 
 export const tiredLessons: TiredLesson[] = [
   {
@@ -209,3 +209,19 @@ export const fitLessons: FitLesson[] = [
     ],
   },
 ];
+
+export const erzaehlDummy: ErzaehlLesson = {
+  mode: 'erzaehl',
+  saetze: [
+    { es: 'Hoy he ido al gimnasio por primera vez.', de: 'Heute bin ich zum ersten Mal ins Fitnessstudio gegangen.' },
+    { es: 'Después he comido pizza con mis amigos.', de: 'Danach habe ich mit meinen Freunden Pizza gegessen.' },
+    { es: 'Por la noche he llamado a mi hermana.', de: 'Abends habe ich meine Schwester angerufen.' },
+  ],
+  vocab: [
+    { es: 'por primera vez', de: 'zum ersten Mal' },
+    { es: 'el gimnasio', de: 'das Fitnessstudio' },
+    { es: 'después', de: 'danach / nachher' },
+    { es: 'por la noche', de: 'abends / nachts' },
+    { es: 'llamar', de: 'anrufen' },
+  ],
+};

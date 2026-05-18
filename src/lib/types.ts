@@ -45,4 +45,10 @@ export interface FitLesson {
   vocab: VocabItem[];
 }
 
-export type Lesson = TiredLesson | OkayLesson | FitLesson;
+export interface ErzaehlLesson {
+  mode: 'erzaehl';
+  saetze: { es: string; de: string }[];
+  vocab: VocabItem[];
+}
+
+export type Lesson = TiredLesson | OkayLesson | FitLesson | ErzaehlLesson;
