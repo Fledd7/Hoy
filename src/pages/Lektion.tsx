@@ -26,13 +26,6 @@ function getLessonForMode(mode: EnergyMode): Lesson | null {
   }
 }
 
-const MODE_LABELS: Record<EnergyMode, string> = {
-  muede: 'Müde',
-  okay: 'Okay',
-  fit: 'Fit',
-  erzaehl: 'Erzähl mir was',
-}
-
 export default function Lektion() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -116,11 +109,6 @@ export default function Lektion() {
       >
         ← Zurück
       </button>
-      <div className="mb-5">
-        <span className="text-xs font-semibold text-accent uppercase tracking-wide">
-          Modus: {MODE_LABELS[mode]}
-        </span>
-      </div>
       <LessonView lesson={lesson} onFinish={handleFinish} />
     </div>
   )

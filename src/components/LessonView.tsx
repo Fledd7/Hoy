@@ -19,19 +19,98 @@ export default function LessonView({ lesson, onFinish }: LessonViewProps) {
   return <FitView lesson={lesson} onFinish={onFinish} />
 }
 
+// ─── Inline vocab helpers for TiredView ──────────────────────────────────────
+
+interface Segment {
+  text: string
+  de?: string
+  key?: string
+}
+
+function stripArticle(es: string): string {
+  return es.replace(/^(el|la|los|las|un|una)\s+/i, '').trim()
+}
+
+function splitTextWithVocab(text: string, vocab: { es: string; de: string }[]): Segment[] {
+  const terms = vocab
+    .map(v => ({ base: stripArticle(v.es), de: v.de, key: v.es }))
+    .sort((a, b) => b.base.length - a.base.length)
+
+  const escapedPatterns = terms.map(t => {
+    const words = t.base.split(' ').map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    words[words.length - 1] += '[a-záéíóúüñ]*'
+    return words.join(' ')
+  })
+
+  const combined = new RegExp(`(${escapedPatterns.join('|')})`, 'gi')
+  const parts = text.split(combined)
+
+  return parts
+    .filter(p => p.length > 0)
+    .map(part => {
+      const matched = terms.find(t => {
+        const words = t.base.split(' ').map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        words[words.length - 1] += '[a-záéíóúüñ]*'
+        return new RegExp(`^${words.join(' ')}$`, 'i').test(part)
+      })
+      return matched ? { text: part, de: matched.de, key: matched.key } : { text: part }
+    })
+}
+
+function InlineVocabWord({
+  text,
+  de,
+  revealed,
+  onTap,
+}: {
+  text: string
+  de: string
+  revealed: boolean
+  onTap: () => void
+}) {
+  return (
+    <span className="inline-flex flex-col items-start">
+      <button
+        onClick={onTap}
+        className="font-semibold text-accent underline decoration-dotted tap-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded leading-[inherit]"
+      >
+        {text}
+      </button>
+      {revealed && (
+        <span className="text-xs text-muted bg-[#F0EDE8] rounded px-1.5 py-0.5 mt-0.5 leading-none">
+          {de}
+        </span>
+      )}
+    </span>
+  )
+}
+
+// ─── Views ───────────────────────────────────────────────────────────────────
+
 function TiredView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'muede' }>; onFinish: () => void }) {
+  const [revealed, setRevealed] = useState<Set<string>>(new Set())
+  const segments = splitTextWithVocab(lesson.text, lesson.vocab)
+
   return (
     <div className="fade-in flex flex-col gap-6">
       <Card>
-        <p className="text-lg leading-relaxed text-text font-medium">{lesson.text}</p>
+        <div className="text-lg leading-relaxed text-text font-medium">
+          {segments.map((seg, i) =>
+            seg.de && seg.key ? (
+              <InlineVocabWord
+                key={i}
+                text={seg.text}
+                de={seg.de}
+                revealed={revealed.has(seg.key)}
+                onTap={() => setRevealed(prev => new Set([...prev, seg.key!]))}
+              />
+            ) : (
+              <span key={i}>{seg.text}</span>
+            )
+          )}
+        </div>
         <p className="text-muted text-base leading-relaxed mt-4">{lesson.translation}</p>
       </Card>
-      <div className="flex flex-col gap-3">
-        <p className="text-sm font-medium text-muted uppercase tracking-wide">Vokabeln</p>
-        {lesson.vocab.map((v) => (
-          <VocabTap key={v.es} es={v.es} de={v.de} />
-        ))}
-      </div>
       <Button variant="primary" fullWidth onClick={onFinish}>
         Fertig
       </Button>
@@ -149,6 +228,7 @@ function FitView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'fit' }
             <span className="text-xs font-semibold text-accent uppercase tracking-wide">Schritt 2 von 2</span>
             <span className="text-xs text-muted">Vokabeln</span>
           </div>
+          <p className="text-xs text-muted -mt-3">Tippe auf eine Vokabel, um die Übersetzung zu sehen</p>
           <div className="flex flex-col gap-3">
             {lesson.vocab.map((v) => (
               <VocabTap key={v.es} es={v.es} de={v.de} />

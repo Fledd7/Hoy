@@ -13,7 +13,7 @@ export default function Button({
   ...props
 }: ButtonProps) {
   const base =
-    'inline-flex items-center justify-center min-h-[64px] px-6 text-base font-medium rounded-btn tap-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none'
+    'inline-flex items-center justify-center min-h-[64px] px-6 text-base font-medium rounded-btn tap-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:bg-[#E5E2DD] disabled:text-[#9B9B9B] disabled:border-transparent disabled:cursor-not-allowed'
 
   const variants = {
     primary: 'bg-accent text-white hover:bg-[#a8442e]',
