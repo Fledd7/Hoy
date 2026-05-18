@@ -2,6 +2,9 @@ import { buildPrompt } from './prompts'
 
 export const config = { runtime: 'edge' }
 
+// Vercel injects process.env in Edge Functions; declare the subset we use.
+declare const process: { env: Record<string, string | undefined> }
+
 interface RequestBody {
   modus: 'muede' | 'okay' | 'fit' | 'erzaehl'
   profil: { niveau: string; themen: string[]; why: string }
