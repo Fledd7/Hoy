@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../components/Button'
 import ThemeChip from '../components/ThemeChip'
-import { getUser, saveUser, resetAll } from '../lib/storage'
+import { getUser, saveUser, resetAll, getSeenVocab } from '../lib/storage'
 import { THEMEN, REQUIRED_THEMEN_COUNT } from '../lib/config'
 import type { UserData } from '../lib/types'
 
@@ -13,9 +13,23 @@ const NIVEAU_LABELS: Record<UserData['niveau'], string> = {
   wiedereinsteiger_b1: 'Wiedereinsteiger – B1+',
 }
 
+function VocabChip({ es, de }: { es: string; de: string }) {
+  const [revealed, setRevealed] = useState(false)
+  return (
+    <button
+      onClick={() => setRevealed(r => !r)}
+      className="bg-white border border-[#E0DDD8] rounded-full px-3 py-1.5 text-sm text-text tap-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent text-left"
+    >
+      <span className="font-medium">{es}</span>
+      {revealed && <span className="text-muted ml-1">– {de}</span>}
+    </button>
+  )
+}
+
 export default function Profil() {
   const navigate = useNavigate()
   const user = getUser()
+  const seenVocab = getSeenVocab()
 
   const [themen, setThemen] = useState<string[]>(user?.themen ?? [])
   const [why, setWhy] = useState(user?.why ?? '')
@@ -59,7 +73,7 @@ export default function Profil() {
       >
         ← Zurück
       </button>
-      <h1 className="text-2xl font-semibold text-text mb-8">Profil</h1>
+      <h1 className="font-serif text-[32px] font-semibold text-text mb-8 leading-tight">Profil</h1>
 
       <section className="mb-8">
         <h2 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3">Niveau</h2>
@@ -87,6 +101,20 @@ export default function Profil() {
           <p className="text-sm text-muted mt-2">
             Bitte wähle genau {REQUIRED_THEMEN_COUNT} Themen.
           </p>
+        )}
+      </section>
+
+      <section className="mb-8">
+        <h2 className="font-serif text-[20px] font-semibold text-text mb-1 leading-tight">Deine Wörter</h2>
+        <p className="text-[14px] text-muted mb-3">Alle Vokabeln, die du bisher gesehen hast.</p>
+        {seenVocab.length === 0 ? (
+          <p className="text-sm text-muted">Noch keine Wörter gelernt.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {[...seenVocab].reverse().map((v) => (
+              <VocabChip key={v.es} es={v.es} de={v.de} />
+            ))}
+          </div>
         )}
       </section>
 
@@ -122,7 +150,7 @@ export default function Profil() {
         >
           Alle Daten zurücksetzen
         </Button>
-        <p className="text-center text-[12px] text-[#9B9B9B] mt-8">Hoy v0.3</p>
+        <p className="text-center text-[12px] text-[#9B9B9B] mt-8">Hoy v0.4</p>
       </div>
     </div>
   )

@@ -13,9 +13,36 @@ const ENERGIE_BUTTONS: { mode: EnergyMode; label: string; sublabel: string }[] =
   { mode: 'erzaehl', label: 'Erzähl mir was', sublabel: 'Dein Tag auf Spanisch' },
 ]
 
+const TIME_GREETINGS: { es: string; de: string; hours: [number, number] }[] = [
+  { es: 'Buenos días.', de: 'Guten Morgen.', hours: [5, 12] },
+  { es: 'Buenas tardes.', de: 'Guten Nachmittag.', hours: [12, 18] },
+  { es: 'Buenas noches.', de: 'Guten Abend.', hours: [18, 5] },
+]
+
+const RANDOM_GREETINGS: { es: string; de: string }[] = [
+  { es: '¿Listo para aprender?', de: 'Bereit zum Lernen?' },
+  { es: '¿Qué tal?', de: 'Wie läuft\'s?' },
+  { es: 'Hola de nuevo.', de: 'Hallo nochmal.' },
+  { es: '¿Cómo estás hoy?', de: 'Wie geht\'s dir heute?' },
+  { es: 'Un poco cada día.', de: 'Ein bisschen jeden Tag.' },
+]
+
+function pickGreeting(): { es: string; de: string } {
+  const hour = new Date().getHours()
+  const timeMatch = TIME_GREETINGS.find(g => {
+    const [from, to] = g.hours
+    return from < to ? hour >= from && hour < to : hour >= from || hour < to
+  })
+  // Alternate between time-based and random using current minute parity
+  if (timeMatch && new Date().getMinutes() % 2 === 0) return timeMatch
+  const random = RANDOM_GREETINGS[Math.floor(Math.random() * RANDOM_GREETINGS.length)]
+  return random
+}
+
 export default function Heute() {
   const navigate = useNavigate()
   const [showBanner, setShowBanner] = useState(false)
+  const [greeting] = useState(pickGreeting)
 
   useEffect(() => {
     if (!isOnboardingDone()) {
@@ -39,9 +66,10 @@ export default function Heute() {
           <ProfileIcon />
         </header>
         <main className="flex flex-col flex-1 justify-center">
-          <h1 className="text-2xl font-semibold text-text mb-8 leading-snug">
-            Wie geht's dir heute?
-          </h1>
+          <div className="mb-8">
+            <p className="font-serif text-[28px] font-semibold text-text leading-tight">{greeting.es}</p>
+            <p className="text-[14px] text-muted mt-1">{greeting.de}</p>
+          </div>
           <ReturnBanner visible={showBanner} />
           <div className="flex flex-col gap-3">
             {ENERGIE_BUTTONS.map((btn) => (
