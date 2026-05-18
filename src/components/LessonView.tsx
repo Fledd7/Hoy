@@ -10,13 +10,10 @@ interface LessonViewProps {
 }
 
 export default function LessonView({ lesson, onFinish }: LessonViewProps) {
-  if (lesson.mode === 'muede') {
-    return <TiredView lesson={lesson} onFinish={onFinish} />
-  }
-  if (lesson.mode === 'okay') {
-    return <OkayView lesson={lesson} onFinish={onFinish} />
-  }
-  return <FitView lesson={lesson} onFinish={onFinish} />
+  if (lesson.mode === 'muede') return <TiredView lesson={lesson} onFinish={onFinish} />
+  if (lesson.mode === 'okay') return <OkayView lesson={lesson} onFinish={onFinish} />
+  if (lesson.mode === 'fit')  return <FitView lesson={lesson} onFinish={onFinish} />
+  return <ErzaehlView lesson={lesson} onFinish={onFinish} />
 }
 
 // ─── Inline vocab helpers for TiredView ──────────────────────────────────────
@@ -252,6 +249,32 @@ function FitView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'fit' }
           </Button>
         </>
       )}
+    </div>
+  )
+}
+
+function ErzaehlView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'erzaehl' }>; onFinish: () => void }) {
+  return (
+    <div className="fade-in flex flex-col gap-6">
+      <Card>
+        <div className="flex flex-col gap-4">
+          {lesson.saetze.map((s, i) => (
+            <div key={i}>
+              <p className="text-base text-text font-medium">{s.es}</p>
+              <p className="text-sm text-muted mt-0.5">{s.de}</p>
+            </div>
+          ))}
+        </div>
+      </Card>
+      <p className="text-xs text-muted">Tippe auf eine Vokabel zum Aufdecken</p>
+      <div className="flex flex-col gap-3">
+        {lesson.vocab.map((v) => (
+          <VocabTap key={v.es} es={v.es} de={v.de} />
+        ))}
+      </div>
+      <Button variant="primary" fullWidth onClick={onFinish}>
+        Fertig
+      </Button>
     </div>
   )
 }
