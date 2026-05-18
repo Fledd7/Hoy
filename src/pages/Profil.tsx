@@ -97,7 +97,7 @@ export default function Profil() {
         <textarea
           value={why}
           onChange={(e) => { setWhy(e.target.value); setSaved(false) }}
-          placeholder="Urlaub, Familie, Neugier…"
+          placeholder="Zum Beispiel: Mit der Familie meiner Partnerin reden können."
           rows={3}
           className="w-full bg-white border border-[#E0DDD8] rounded-card px-4 py-3 text-base text-text placeholder:text-muted resize-none focus:outline-none focus:ring-2 focus:ring-accent"
         />
