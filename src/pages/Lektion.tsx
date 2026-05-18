@@ -41,8 +41,9 @@ export default function Lektion() {
 
   const handleFinish = useCallback(() => {
     setAbschluss(true)
-    setTimeout(() => navigate('/heute', { replace: true }), 800)
-  }, [navigate])
+    const duration = mode === 'muede' ? 1200 : 800
+    setTimeout(() => navigate('/heute', { replace: true }), duration)
+  }, [navigate, mode])
 
   if (!mode) {
     return (
@@ -93,9 +94,13 @@ export default function Lektion() {
   }
 
   if (abschluss) {
+    const isMuede = mode === 'muede'
+    const text = isMuede ? 'Gut. Mehr muss heute nicht sein.' : abschlussSatz
     return (
-      <div className="flex flex-col min-h-screen bg-background items-center justify-center fade-in">
-        <p className="text-2xl font-semibold text-text">{abschlussSatz}</p>
+      <div className="flex flex-col min-h-screen bg-background items-center justify-center fade-in px-6">
+        <p className={`text-center text-text ${isMuede ? 'text-[18px]' : 'text-2xl font-semibold'}`}>
+          {text}
+        </p>
       </div>
     )
   }
