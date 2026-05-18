@@ -57,6 +57,11 @@ function splitTextWithVocab(text: string, vocab: { es: string; de: string }[]): 
     })
 }
 
+function truncateToTwoSentences(text: string): string {
+  const match = text.match(/^[^.!?]*[.!?](?:\s+[^.!?]*[.!?])?/)
+  return match ? match[0] : text
+}
+
 function InlineVocabWord({
   text,
   de,
@@ -69,15 +74,15 @@ function InlineVocabWord({
   onTap: () => void
 }) {
   return (
-    <span className="inline-flex flex-col items-start">
+    <span className="inline-flex flex-col items-start align-baseline">
       <button
         onClick={onTap}
-        className="font-semibold text-accent underline decoration-dotted tap-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded leading-[inherit]"
+        className="text-text bg-[#F3E8E5] rounded-[4px] px-1 tap-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         {text}
       </button>
       {revealed && (
-        <span className="text-xs text-muted bg-[#F0EDE8] rounded px-1.5 py-0.5 mt-0.5 leading-none">
+        <span className="bg-white border border-[#E0DBD6] rounded-[8px] px-2 py-1 text-[13px] text-text mt-1 leading-snug">
           {de}
         </span>
       )}
@@ -89,10 +94,18 @@ function InlineVocabWord({
 
 function TiredView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'muede' }>; onFinish: () => void }) {
   const [revealed, setRevealed] = useState<Set<string>>(new Set())
-  const segments = splitTextWithVocab(lesson.text, lesson.vocab)
+  const truncatedText = truncateToTwoSentences(lesson.text)
+  const truncatedTranslation = truncateToTwoSentences(lesson.translation)
+  const segments = splitTextWithVocab(truncatedText, lesson.vocab)
 
   return (
     <div className="fade-in flex flex-col gap-6">
+      <div>
+        <h2 className="text-[20px] text-text font-semibold">Heute ganz leicht</h2>
+        <p className="text-[14px] text-muted mt-1">
+          Lies nur den kleinen Text. Tippe auf markierte Wörter, wenn du magst.
+        </p>
+      </div>
       <Card>
         <div className="text-lg leading-relaxed text-text font-medium">
           {segments.map((seg, i) =>
@@ -109,10 +122,10 @@ function TiredView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'mued
             )
           )}
         </div>
-        <p className="text-muted text-base leading-relaxed mt-4">{lesson.translation}</p>
+        <p className="text-muted text-base leading-relaxed mt-4">{truncatedTranslation}</p>
       </Card>
       <Button variant="primary" fullWidth onClick={onFinish}>
-        Fertig
+        Reicht für heute
       </Button>
     </div>
   )
@@ -228,7 +241,7 @@ function FitView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'fit' }
             <span className="text-xs font-semibold text-accent uppercase tracking-wide">Schritt 2 von 2</span>
             <span className="text-xs text-muted">Vokabeln</span>
           </div>
-          <p className="text-xs text-muted -mt-3">Tippe auf eine Vokabel, um die Übersetzung zu sehen</p>
+          <p className="text-xs text-muted -mt-3">Tippe auf eine Vokabel zum Aufdecken</p>
           <div className="flex flex-col gap-3">
             {lesson.vocab.map((v) => (
               <VocabTap key={v.es} es={v.es} de={v.de} />
