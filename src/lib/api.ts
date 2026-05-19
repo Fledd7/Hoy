@@ -151,6 +151,7 @@ export interface LessonProfil {
   niveau: string
   themen: string[]
   why: string
+  etappeNummer?: 1 | 2 | 3 | 4 | 5
   etappenName?: string
   etappenBeschreibung?: string
   etappenNiveau?: string

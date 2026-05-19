@@ -7,12 +7,13 @@ import Card from './Card'
 interface LessonViewProps {
   lesson: Lesson
   onFinish: () => void
+  etappeNummer?: number
 }
 
-export default function LessonView({ lesson, onFinish }: LessonViewProps) {
-  if (lesson.mode === 'muede') return <TiredView lesson={lesson} onFinish={onFinish} />
+export default function LessonView({ lesson, onFinish, etappeNummer }: LessonViewProps) {
+  if (lesson.mode === 'muede') return <TiredView lesson={lesson} onFinish={onFinish} etappeNummer={etappeNummer} />
   if (lesson.mode === 'okay') return <OkayView lesson={lesson} onFinish={onFinish} />
-  if (lesson.mode === 'fit')  return <FitView lesson={lesson} onFinish={onFinish} />
+  if (lesson.mode === 'fit')  return <FitView lesson={lesson} onFinish={onFinish} etappeNummer={etappeNummer} />
   return <ErzaehlView lesson={lesson} onFinish={onFinish} />
 }
 
@@ -96,8 +97,28 @@ function LineChevron({ open, onToggle, label }: { open: boolean; onToggle: () =>
 
 // ─── Views ───────────────────────────────────────────────────────────────────
 
-function TiredView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'muede' }>; onFinish: () => void }) {
+function TiredView({ lesson, onFinish, etappeNummer }: {
+  lesson: Extract<Lesson, { mode: 'muede' }>
+  onFinish: () => void
+  etappeNummer?: number
+}) {
   const [showTranslation, setShowTranslation] = useState(false)
+
+  // Etappe 1: show vocab flip-cards instead of reading text
+  if (etappeNummer === 1) {
+    return (
+      <div className="fade-in flex flex-col gap-6">
+        <div>
+          <h2 className="text-[20px] text-text font-semibold">Neue Vokabeln</h2>
+          <p className="text-[14px] text-muted mt-1">
+            Tippe auf die Karte, um die Übersetzung zu sehen.
+          </p>
+        </div>
+        <FitVocabSwipe vocab={lesson.vocab} onFinish={onFinish} />
+      </div>
+    )
+  }
+
   const truncatedText = truncateToTwoSentences(lesson.text)
   const truncatedTranslation = truncateToTwoSentences(lesson.translation)
   const segments = splitTextWithVocab(truncatedText, lesson.vocab)
@@ -489,8 +510,73 @@ function FitVocabSwipe({ vocab, onFinish }: { vocab: { es: string; de: string }[
   )
 }
 
-function FitView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'fit' }>; onFinish: () => void }) {
+// ─── Mini-Dialog Card (Etappe 1 Fit) ─────────────────────────────────────────
+
+function MiniDialogCard({
+  lines,
+  index,
+}: {
+  lines: { speaker: string; es: string; de: string }[]
+  index: number
+}) {
+  const [revealed, setRevealed] = useState<Set<number>>(new Set())
+
+  return (
+    <div
+      className="bg-white rounded-[16px] px-4 py-3 enter-up"
+      style={{
+        border: '1px solid rgba(224,219,214,0.8)',
+        boxShadow: '0 1px 4px rgba(26,26,26,0.04)',
+        animationDelay: `${index * 60}ms`,
+      }}
+    >
+      <p
+        className="text-[10px] text-muted mb-2"
+        style={{ textTransform: 'uppercase', letterSpacing: '0.06em' }}
+      >
+        Mini-Dialog {index + 1}
+      </p>
+      <div className="flex flex-col gap-3">
+        {lines.map((line, i) => (
+          <div key={i}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <span className="text-[11px] font-semibold text-accent uppercase tracking-wide">{line.speaker}</span>
+                <p className="text-[15px] text-text mt-0.5">{line.es}</p>
+              </div>
+              <LineChevron
+                open={revealed.has(i)}
+                onToggle={() => setRevealed(prev => {
+                  const next = new Set(prev)
+                  if (next.has(i)) next.delete(i)
+                  else next.add(i)
+                  return next
+                })}
+                label={revealed.has(i) ? 'Übersetzung verbergen' : 'Übersetzung zeigen'}
+              />
+            </div>
+            {revealed.has(i) && (
+              <p className="text-[13px] text-muted mt-1 fade-in">{line.de}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function FitView({ lesson, onFinish, etappeNummer }: {
+  lesson: Extract<Lesson, { mode: 'fit' }>
+  onFinish: () => void
+  etappeNummer?: number
+}) {
   const [step, setStep] = useState<1 | 2>(1)
+
+  // For Etappe 1: chunk dialog into 3 mini-dialog cards (2 lines each)
+  const isMiniDialogs = etappeNummer === 1
+  const miniDialogGroups = isMiniDialogs
+    ? [lesson.dialog.slice(0, 2), lesson.dialog.slice(2, 4), lesson.dialog.slice(4, 6)]
+    : null
 
   return (
     <div className="fade-in flex flex-col gap-6">
@@ -500,7 +586,15 @@ function FitView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'fit' }
             <span className="text-xs font-semibold text-accent uppercase tracking-wide">Schritt 1 von 2</span>
             <span className="text-xs text-muted">Dialog</span>
           </div>
-          <FitDialogCard dialog={lesson.dialog} />
+          {isMiniDialogs && miniDialogGroups ? (
+            <div className="flex flex-col gap-3">
+              {miniDialogGroups.map((lines, i) => (
+                <MiniDialogCard key={i} lines={lines} index={i} />
+              ))}
+            </div>
+          ) : (
+            <FitDialogCard dialog={lesson.dialog} />
+          )}
           <Button
             variant="primary"
             fullWidth
