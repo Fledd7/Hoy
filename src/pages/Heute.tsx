@@ -4,13 +4,21 @@ import { BookOpen, Zap, Flame, MessageCircle } from 'lucide-react'
 import ProfileIcon from '../components/ProfileIcon'
 import EnergyButton from '../components/EnergyButton'
 import ReturnBanner from '../components/ReturnBanner'
-import { isOnboardingDone, getDaysSinceLastOpen, updateLetztesOeffnen, getCompletedModesToday } from '../lib/storage'
-import type { EnergyMode } from '../lib/types'
+import {
+  isOnboardingDone,
+  getDaysSinceLastOpen,
+  updateLetztesOeffnen,
+  getCompletedModesToday,
+  ensureEtappenMigration,
+  getUser,
+} from '../lib/storage'
+import { ETAPPEN } from '../lib/etappen'
+import type { EnergyMode, UserData } from '../lib/types'
 
 const ENERGIE_BUTTONS: { mode: EnergyMode; label: string; sublabel: string; icon: ReactNode }[] = [
-  { mode: 'muede',   label: 'Müde',         sublabel: 'Kurzer Lese-Snack, 2 Minuten',   icon: <BookOpen size={22} /> },
-  { mode: 'okay',    label: 'Okay',          sublabel: 'Lektion mit Verständnisfragen',  icon: <Zap size={22} /> },
-  { mode: 'fit',     label: 'Fit',           sublabel: 'Dialog + Vokabeln, zwei Teile',  icon: <Flame size={22} /> },
+  { mode: 'muede',   label: 'Müde',          sublabel: 'Kurzer Lese-Snack, 2 Minuten',  icon: <BookOpen size={22} /> },
+  { mode: 'okay',    label: 'Okay',           sublabel: 'Lektion mit Verständnisfragen', icon: <Zap size={22} /> },
+  { mode: 'fit',     label: 'Fit',            sublabel: 'Dialog + Vokabeln, zwei Teile', icon: <Flame size={22} /> },
   { mode: 'erzaehl', label: 'Erzähl mir was', sublabel: 'Dein Tag auf Spanisch',         icon: <MessageCircle size={22} /> },
 ]
 
@@ -51,30 +59,70 @@ export default function Heute() {
   const [showBanner, setShowBanner] = useState(false)
   const [greeting] = useState(pickGreeting)
   const [doneToday, setDoneToday] = useState<Set<EnergyMode>>(new Set())
+  const [user, setUser] = useState<UserData | null>(null)
 
   useEffect(() => {
     if (!isOnboardingDone()) {
       navigate('/onboarding', { replace: true })
       return
     }
+    ensureEtappenMigration()
     const days = getDaysSinceLastOpen()
     setShowBanner(days > 3)
     updateLetztesOeffnen()
     setDoneToday(getCompletedModesToday())
+    setUser(getUser())
   }, [navigate])
 
   function handleEnergySelect(mode: EnergyMode) {
     navigate(`/lektion?mode=${mode}`)
   }
 
+  const etappe = user?.etappe !== undefined ? ETAPPEN[user.etappe - 1] : null
+  const lektionen = Math.min(user?.lektionenInEtappe ?? 0, 10)
+
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#FAF7F2] to-[#F5F1EB]">
       <div className="w-full max-w-content mx-auto px-6 pt-6 pb-8 flex flex-col">
 
-        <header className="flex items-center justify-between mb-8">
+        <header className="flex items-center justify-between mb-6">
           <span className="font-serif text-[28px] font-bold text-text">Hoy</span>
           <ProfileIcon />
         </header>
+
+        {/* Etappen-Indikator */}
+        {etappe && (
+          <button
+            onClick={() => navigate('/profil')}
+            className="mb-6 w-full text-left tap-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-[12px]"
+          >
+            <p
+              className="text-[11px] text-muted mb-1"
+              style={{ textTransform: 'uppercase', letterSpacing: '0.08em' }}
+            >
+              Deine Etappe
+            </p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-serif text-[22px] font-semibold text-text leading-tight">
+                {etappe.name}
+              </p>
+              <div className="flex items-center gap-[3px] flex-shrink-0">
+                {Array.from({ length: 10 }).map((_, i) => (
+                  <span
+                    key={i}
+                    className="rounded-full"
+                    style={{
+                      width: 16,
+                      height: 2,
+                      backgroundColor: i < lektionen ? '#C2553D' : '#E0DBD6',
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+            <p className="text-[13px] text-muted italic mt-0.5">{etappe.untertitel}</p>
+          </button>
+        )}
 
         <div className="mb-12">
           <p

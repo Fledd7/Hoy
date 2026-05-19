@@ -4,6 +4,8 @@ export interface UserData {
   why: string;
   onboardingDone: boolean;
   letztesOeffnen: string;
+  etappe?: 1 | 2 | 3 | 4 | 5;
+  lektionenInEtappe?: number;
 }
 
 export type EnergyMode = 'muede' | 'okay' | 'fit' | 'erzaehl';
