@@ -188,6 +188,7 @@ export default function Lektion() {
             niveau: user.niveau,
             themen: user.themen,
             why: user.why,
+            etappeNummer: etappe?.nummer,
             etappenName: etappe?.name,
             etappenBeschreibung: etappe?.beschreibung,
             etappenNiveau: etappe?.niveau,
@@ -361,7 +362,7 @@ export default function Lektion() {
   return (
     <div className={PAGE_WRAP}>
       {backBtn}
-      <LessonView lesson={pageState.lesson} onFinish={handleFinish} />
+      <LessonView lesson={pageState.lesson} onFinish={handleFinish} etappeNummer={getUser()?.etappe} />
     </div>
   )
 }
