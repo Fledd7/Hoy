@@ -169,13 +169,20 @@ export async function fetchLektion(
     body: JSON.stringify({ modus, profil, userInput }),
   })
 
-  if (!res.ok) throw new Error(`api_error_${res.status}`)
-
-  const raw: unknown = await res.json()
+  // Parse JSON regardless of status code so we can distinguish error types.
+  // Non-JSON responses (e.g. network proxy errors) are caught below.
+  let raw: unknown
+  try {
+    raw = await res.json()
+  } catch {
+    throw new Error(`api_error_${res.status}`)
+  }
 
   if (typeof raw === 'object' && raw !== null && 'error' in raw) {
     throw new Error('fallback')
   }
+
+  if (!res.ok) throw new Error(`api_error_${res.status}`)
 
   const lesson = mapToLesson(modus, raw)
   setCache(modus, lesson)
