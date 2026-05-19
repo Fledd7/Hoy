@@ -256,36 +256,33 @@ export default function Lektion() {
     if (pageState.kind !== 'ready') { handleFinish(); return }
 
     const phase = getAnfaengerPhase()
-    if (phase === 'phase1' && mode === 'okay') {
-      // Record vocab first, then show SpielBildMatching
-      const vocab = extractVocab(pageState.lesson)
-      addSeenVocab(vocab)
-      recordVocabSeen(vocab)
-      if (mode) addCompletedModeToday(mode)
-      incrementLektionenInEtappe()
-      setPageState({ kind: 'spiel_bild_matching' })
-      return
-    }
-    if (phase === 'phase1' && mode === 'fit') {
-      const vocab = extractVocab(pageState.lesson)
-      addSeenVocab(vocab)
-      recordVocabSeen(vocab)
-      if (mode) addCompletedModeToday(mode)
-      incrementLektionenInEtappe()
-      setPageState({ kind: 'spiel_wort_paare' })
-      return
-    }
-    if (phase === 'phase2' && mode === 'okay') {
-      const vocab = extractVocab(pageState.lesson)
-      addSeenVocab(vocab)
-      recordVocabSeen(vocab)
-      if (mode) addCompletedModeToday(mode)
-      incrementLektionenInEtappe()
-      setPageState({ kind: 'spiel_luecken_fuellen', vocab })
+    const isPhaseGame =
+      (phase === 'phase1' && (mode === 'okay' || mode === 'fit')) ||
+      (phase === 'phase2' && mode === 'okay')
+
+    if (!isPhaseGame) { handleFinish(); return }
+
+    // Commit lesson state before showing the mini-game
+    const vocab = extractVocab(pageState.lesson)
+    addSeenVocab(vocab)
+    recordVocabSeen(vocab)
+    if (mode) addCompletedModeToday(mode)
+    const { advanced, newEtappe } = incrementLektionenInEtappe()
+
+    if (advanced) {
+      const von = ETAPPEN[newEtappe - 2]
+      const zu = ETAPPEN[newEtappe - 1]
+      setEtappenUebergang({ von, zu })
       return
     }
 
-    handleFinish()
+    if (phase === 'phase1' && mode === 'okay') {
+      setPageState({ kind: 'spiel_bild_matching' })
+    } else if (phase === 'phase1' && mode === 'fit') {
+      setPageState({ kind: 'spiel_wort_paare' })
+    } else {
+      setPageState({ kind: 'spiel_luecken_fuellen', vocab })
+    }
   }, [pageState, mode, handleFinish])
 
   // ─── Etappen-Übergang ─────────────────────────────────────────────────────

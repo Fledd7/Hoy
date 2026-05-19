@@ -112,7 +112,8 @@ export default function SpielLueckenFuellen({ vocab, etappe, onFinish }: Props) 
       totalRounds={luecken.length}
       vocabEs={usedVocab[index]?.es ?? ''}
       onResult={(wasCorrect) => {
-        recordVocabAnswer(usedVocab[index]?.es ?? '', wasCorrect)
+        const key = luecken[index]?.loesung || usedVocab[index]?.es
+        if (key) recordVocabAnswer(key, wasCorrect)
         if (wasCorrect) setCorrect(c => c + 1)
         if (index + 1 >= luecken.length) {
           setDone(true)
