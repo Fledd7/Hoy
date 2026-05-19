@@ -77,7 +77,6 @@ function TranslationToggle({ text, show, onToggle }: { text: string; show: boole
   )
 }
 
-// Chevron toggle button used in per-line collapsible rows
 function LineChevron({ open, onToggle, label }: { open: boolean; onToggle: () => void; label: string }) {
   return (
     <button
@@ -145,6 +144,10 @@ function TiredView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'mued
   )
 }
 
+// ─── MCQ micro-reward constants ───────────────────────────────────────────────
+
+const CORRECT_TEXTS = ['¡bien!', '¡perfecto!', '¡muy bien!', '¡exacto!', '¡eso es!']
+
 function OkayView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'okay' }>; onFinish: () => void }) {
   const [answers, setAnswers] = useState<Record<number, number>>({})
   const [checked, setChecked] = useState(false)
@@ -180,7 +183,6 @@ function OkayView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'okay'
             checked={checked}
             onSelect={(idx) => {
               if (checked) return
-              navigator.vibrate?.(10)
               setAnswers((a) => ({ ...a, [qi]: idx }))
             }}
             style={{ animationDelay: `${(qi + 1) * 80}ms` }}
@@ -213,13 +215,26 @@ function QuizCard({
   onSelect: (idx: number) => void
   style?: React.CSSProperties
 }) {
+  const [microReward, setMicroReward] = useState<{ idx: number; text: string; isCorrect: boolean } | null>(null)
+
+  function handleOptionClick(idx: number) {
+    onSelect(idx)
+    if (checked || microReward !== null) return
+    const isCorrect = idx === question.correctIndex
+    navigator.vibrate?.(isCorrect ? 10 : 5)
+    const text = isCorrect ? CORRECT_TEXTS[Math.floor(Math.random() * CORRECT_TEXTS.length)] : ''
+    setMicroReward({ idx, text, isCorrect })
+    setTimeout(() => setMicroReward(null), isCorrect ? 600 : 400)
+  }
+
   return (
-    <Card className="enter-up" style={style}>
+    <Card className="enter-up relative overflow-visible" style={style}>
       <p className="text-base font-medium text-text mb-3">{question.question}</p>
       <div className="flex flex-col gap-2">
         {question.options.map((opt, idx) => {
           let optStyle = 'border border-[#E0DDD8] text-text'
           let extraClass = ''
+
           if (checked) {
             if (idx === question.correctIndex) {
               optStyle = 'border-2 border-accent text-accent bg-[#FBF0EE]'
@@ -230,10 +245,20 @@ function QuizCard({
           } else if (idx === selected) {
             optStyle = 'border-2 border-accent text-accent bg-[#FBF0EE]'
           }
+
+          // Micro-reward overlay styles (before auswerten)
+          if (!checked && microReward?.idx === idx) {
+            if (microReward.isCorrect) {
+              extraClass += ' correct-glow'
+            } else {
+              extraClass += ' wrong-flash'
+            }
+          }
+
           return (
             <button
               key={idx}
-              onClick={() => onSelect(idx)}
+              onClick={() => handleOptionClick(idx)}
               className={`w-full text-left px-4 py-3 rounded-btn text-sm tap-scale ${optStyle} ${extraClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
             >
               {opt}
@@ -241,11 +266,16 @@ function QuizCard({
           )
         })}
       </div>
+      {microReward?.isCorrect && (
+        <span className="bubble-in absolute -top-3 right-3 z-10 bg-accent text-white text-[12px] font-semibold px-3 py-1 rounded-full pointer-events-none whitespace-nowrap shadow-[0_2px_8px_rgba(194,85,61,0.4)]">
+          {microReward.text}
+        </span>
+      )}
     </Card>
   )
 }
 
-// ─── Fit Dialog Card with per-line collapsible translations ──────────────────
+// ─── Fit Dialog Card ──────────────────────────────────────────────────────────
 
 function FitDialogCard({ dialog }: { dialog: { speaker: string; es: string; de: string }[] }) {
   const [revealed, setRevealed] = useState<Set<number>>(new Set())
@@ -299,7 +329,7 @@ function FitDialogCard({ dialog }: { dialog: { speaker: string; es: string; de: 
   )
 }
 
-// ─── Fit Vocab Swipe ──────────────────────────────────────────────────────────
+// ─── Fit Vocab Swipe with 3D flip ─────────────────────────────────────────────
 
 function FitVocabSwipe({ vocab, onFinish }: { vocab: { es: string; de: string }[]; onFinish: () => void }) {
   const [index, setIndex] = useState(0)
@@ -313,10 +343,12 @@ function FitVocabSwipe({ vocab, onFinish }: { vocab: { es: string; de: string }[
 
   const done = index >= vocab.length
 
+  // direction: 'left' = next card, 'right' = previous card
   function advance(dir: 'left' | 'right') {
+    if (dir === 'right' && index === 0) return // can't go before first card
     setAnimDir(dir)
     setTimeout(() => {
-      setIndex(i => i + 1)
+      setIndex(i => dir === 'left' ? i + 1 : i - 1)
       setRevealed(false)
       setOffset(0)
       setAnimDir(null)
@@ -334,12 +366,14 @@ function FitVocabSwipe({ vocab, onFinish }: { vocab: { es: string; de: string }[
     const dx = e.touches[0].clientX - startXRef.current
     dragXRef.current = dx
     if (Math.abs(dx) > 8) hasDraggedRef.current = true
-    setOffset(dx)
+    // Clamp visual feedback to 80px
+    setOffset(Math.max(-80, Math.min(80, dx)))
   }
 
   function handleTouchEnd() {
     if (animDir !== null) return
-    if (hasDraggedRef.current && Math.abs(dragXRef.current) > 60) {
+    if (hasDraggedRef.current && Math.abs(dragXRef.current) > 50) {
+      // swipe left (dx < 0) = next, swipe right (dx > 0) = previous
       advance(dragXRef.current < 0 ? 'left' : 'right')
     } else {
       setOffset(0)
@@ -368,40 +402,66 @@ function FitVocabSwipe({ vocab, onFinish }: { vocab: { es: string; de: string }[
 
   const card = vocab[index]
 
-  let cardTransform: string
-  let cardTransition: string
+  // Swipe translate for the outer (drag) layer
+  let swipeTransform: string
+  let swipeTransition: string
   if (animDir !== null) {
-    cardTransform = `translateX(${animDir === 'left' ? '-110%' : '110%'})`
-    cardTransition = 'transform 250ms ease-out'
-  } else if (hasDraggedRef.current || offset !== 0) {
-    cardTransform = `translateX(${offset}px)`
-    cardTransition = 'none'
+    swipeTransform = `translateX(${animDir === 'left' ? '-110%' : '110%'})`
+    swipeTransition = 'transform 250ms ease-out'
+  } else if (offset !== 0) {
+    swipeTransform = `translateX(${offset}px)`
+    swipeTransition = 'none'
   } else {
-    cardTransform = 'translateX(0)'
-    cardTransition = 'transform 150ms ease-out'
+    swipeTransform = 'translateX(0)'
+    swipeTransition = 'transform 150ms ease-out'
   }
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="overflow-hidden rounded-card">
+      {/* Clip the swipe slide */}
+      <div className="overflow-hidden rounded-[20px]">
+        {/* key triggers fade-in when card changes */}
         <div
           key={index}
-          style={{ transform: cardTransform, transition: cardTransition }}
+          className="cursor-pointer select-none fade-in"
+          style={{ transform: swipeTransform, transition: swipeTransition }}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
           onClick={handleTap}
-          className="bg-white border border-[#E2D7C8]/50 rounded-card px-6 py-10 min-h-[200px] flex flex-col items-center justify-center cursor-pointer select-none shadow-card fade-in"
         >
-          <p className="text-2xl font-semibold text-text text-center">{card.es}</p>
-          {revealed ? (
-            <p className="text-base text-muted mt-3 text-center fade-in">{card.de}</p>
-          ) : (
-            <p className="text-xs text-muted mt-4">Tippe zum Aufdecken</p>
-          )}
+          {/* Perspective wrapper for 3D flip */}
+          <div style={{ perspective: '1000px' }}>
+            <div
+              className="relative min-h-[200px]"
+              style={{
+                transformStyle: 'preserve-3d',
+                transform: revealed ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                transition: 'transform 400ms ease-out',
+              }}
+            >
+              {/* Front face */}
+              <div
+                className="bg-white rounded-[20px] border border-[#E2D7C8]/50 px-6 py-10 min-h-[200px] flex flex-col items-center justify-center shadow-card"
+                style={{ backfaceVisibility: 'hidden' }}
+              >
+                <p className="text-2xl font-semibold text-text text-center">{card.es}</p>
+                <p className="text-xs text-muted mt-4">Tippe zum Aufdecken</p>
+              </div>
+              {/* Back face */}
+              <div
+                className="absolute inset-0 bg-white rounded-[20px] border border-[#E2D7C8]/50 px-6 py-10 flex flex-col items-center justify-center shadow-card"
+                style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+              >
+                <p className="text-sm text-muted text-center mb-2">{card.es}</p>
+                <p className="text-2xl font-semibold text-text text-center">{card.de}</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
+      {/* Dot indicators */}
       <div className="flex justify-center gap-1.5 items-center">
         {vocab.map((_, i) => (
           <span

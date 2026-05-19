@@ -128,6 +128,10 @@ function mapToLesson(modus: EnergyMode, raw: unknown): Lesson {
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
+export function hasTodayCache(modus: CacheableMode): boolean {
+  return getCached(modus) !== null
+}
+
 export interface LessonProfil {
   niveau: string
   themen: string[]

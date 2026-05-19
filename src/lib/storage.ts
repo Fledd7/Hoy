@@ -1,9 +1,19 @@
-import type { UserData } from './types';
+import type { UserData, LessonHistoryItem } from './types';
 
 const USER_KEY = 'hoy_user';
 const LESSON_CACHE_KEY = 'hoy_lessonCache';
 const SEEN_VOCAB_KEY = 'hoy_seenVocab';
+const COMPLETED_LESSONS_KEY = 'hoy_completedLessons';
+const LESSON_HISTORY_KEY = 'hoy_lessonHistory';
 const MAX_SEEN_VOCAB = 100;
+const MAX_HISTORY = 30;
+
+function todayStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// ─── User ─────────────────────────────────────────────────────────────────────
 
 export function getUser(): UserData | null {
   try {
@@ -29,6 +39,8 @@ export function resetAll(): void {
   localStorage.removeItem(USER_KEY);
   localStorage.removeItem(LESSON_CACHE_KEY);
   localStorage.removeItem(SEEN_VOCAB_KEY);
+  localStorage.removeItem(COMPLETED_LESSONS_KEY);
+  localStorage.removeItem(LESSON_HISTORY_KEY);
 }
 
 export function isOnboardingDone(): boolean {
@@ -71,7 +83,7 @@ export function addSeenVocab(items: { es: string; de: string }[]): void {
   try {
     const existing = getSeenVocab();
     const knownEs = new Set(existing.map(v => v.es));
-    const datum = new Date().toISOString().slice(0, 10);
+    const datum = todayStr();
     const fresh = items
       .filter(v => !knownEs.has(v.es))
       .map(v => ({ es: v.es, de: v.de, datum }));
@@ -80,5 +92,58 @@ export function addSeenVocab(items: { es: string; de: string }[]): void {
     localStorage.setItem(SEEN_VOCAB_KEY, JSON.stringify(trimmed));
   } catch {
     // storage unavailable – skip silently
+  }
+}
+
+// ─── Completed Lessons ────────────────────────────────────────────────────────
+
+export function getCompletedLessons(): string[] {
+  try {
+    const raw = localStorage.getItem(COMPLETED_LESSONS_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as string[];
+  } catch {
+    return [];
+  }
+}
+
+export function addCompletedLesson(): void {
+  try {
+    const today = todayStr();
+    const existing = getCompletedLessons();
+    if (existing.includes(today)) return;
+    localStorage.setItem(COMPLETED_LESSONS_KEY, JSON.stringify([...existing, today]));
+  } catch {
+    // storage unavailable
+  }
+}
+
+export function hasCompletedToday(): boolean {
+  return getCompletedLessons().includes(todayStr());
+}
+
+// ─── Lesson History ───────────────────────────────────────────────────────────
+
+export function getLessonHistory(): LessonHistoryItem[] {
+  try {
+    const raw = localStorage.getItem(LESSON_HISTORY_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as LessonHistoryItem[];
+  } catch {
+    return [];
+  }
+}
+
+export function addLessonHistory(item: LessonHistoryItem): void {
+  try {
+    const existing = getLessonHistory();
+    // One entry per day+mode avoids duplicates when replaying in DEV_MODE
+    const alreadyExists = existing.some(h => h.datum === item.datum && h.modus === item.modus);
+    if (alreadyExists) return;
+    const updated = [...existing, item];
+    const trimmed = updated.slice(Math.max(0, updated.length - MAX_HISTORY));
+    localStorage.setItem(LESSON_HISTORY_KEY, JSON.stringify(trimmed));
+  } catch {
+    // storage unavailable
   }
 }

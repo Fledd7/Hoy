@@ -1,16 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { BookOpen, Zap, Flame, MessageCircle } from 'lucide-react'
 import ProfileIcon from '../components/ProfileIcon'
 import EnergyButton from '../components/EnergyButton'
 import ReturnBanner from '../components/ReturnBanner'
 import { isOnboardingDone, getDaysSinceLastOpen, updateLetztesOeffnen } from '../lib/storage'
 import type { EnergyMode } from '../lib/types'
 
-const ENERGIE_BUTTONS: { mode: EnergyMode; label: string; sublabel: string }[] = [
-  { mode: 'muede', label: 'Müde', sublabel: 'Kurzer Lese-Snack, 2 Minuten' },
-  { mode: 'okay', label: 'Okay', sublabel: 'Lektion mit Verständnisfragen' },
-  { mode: 'fit', label: 'Fit', sublabel: 'Dialog + Vokabeln, zwei Teile' },
-  { mode: 'erzaehl', label: 'Erzähl mir was', sublabel: 'Dein Tag auf Spanisch' },
+const ENERGIE_BUTTONS: { mode: EnergyMode; label: string; sublabel: string; icon: ReactNode }[] = [
+  { mode: 'muede', label: 'Müde', sublabel: 'Kurzer Lese-Snack, 2 Minuten', icon: <BookOpen size={22} /> },
+  { mode: 'okay', label: 'Okay', sublabel: 'Lektion mit Verständnisfragen', icon: <Zap size={22} /> },
+  { mode: 'fit', label: 'Fit', sublabel: 'Dialog + Vokabeln, zwei Teile', icon: <Flame size={22} /> },
+  { mode: 'erzaehl', label: 'Erzähl mir was', sublabel: 'Dein Tag auf Spanisch', icon: <MessageCircle size={22} /> },
 ]
 
 const TIME_GREETINGS: { es: string; de: string; hours: [number, number] }[] = [
@@ -77,6 +78,7 @@ export default function Heute() {
                 <EnergyButton
                   label={btn.label}
                   sublabel={btn.sublabel}
+                  icon={btn.icon}
                   onClick={() => handleEnergySelect(btn.mode)}
                 />
               </div>
