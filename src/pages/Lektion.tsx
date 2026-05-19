@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import LessonView from '../components/LessonView'
+import SpielBildMatching from '../components/SpielBildMatching'
+import SpielWortPaare from '../components/SpielWortPaare'
+import SpielReihenfolge from '../components/SpielReihenfolge'
 import Button from '../components/Button'
 import {
   getUser,
@@ -11,9 +14,12 @@ import {
   ensureEtappenMigration,
 } from '../lib/storage'
 import { fetchLektion, clearModeCache } from '../lib/api'
+import { recordVocabSeen, getReviewableCount } from '../lib/vocabTracking'
+import { getAnfaengerPhase } from '../lib/anfaengerPfad'
 import { ETAPPEN } from '../lib/etappen'
+import { ANFAENGER_VOKABULAR } from '../lib/anfaengerVokabular'
 import type { Etappe } from '../lib/etappen'
-import type { EnergyMode, Lesson } from '../lib/types'
+import type { EnergyMode, Lesson, VocabItem } from '../lib/types'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -33,15 +39,10 @@ function extractVocab(lesson: Lesson): { es: string; de: string }[] {
   return lesson.vocab
 }
 
-function extractKeyword(lesson: Lesson): { es: string; de: string } | null {
-  if (lesson.mode === 'muede') return lesson.vocab[0] ?? null
-  if (lesson.mode === 'fit')   return lesson.vocab[0] ?? null
-  if (lesson.mode === 'erzaehl') return lesson.vocab[0] ?? null
-  const stop = new Set(['el','la','los','las','un','una','en','de','a','y','que',
-    'se','su','con','por','para','es','ha','al','del','su','lo'])
-  const words = lesson.text.split(/[\s,.:;!?'"()]+/)
-  const word = words.find(w => w.length > 4 && !stop.has(w.toLowerCase()))
-  return word ? { es: word, de: '' } : null
+function extractKeyword(lesson: Lesson): VocabItem | null {
+  if (lesson.schluesselwort?.es && lesson.schluesselwort?.de) return lesson.schluesselwort
+  if (lesson.mode !== 'okay' && lesson.vocab.length > 0) return lesson.vocab[0]
+  return null
 }
 
 // ─── Etappen-Übergangs-Screen ─────────────────────────────────────────────────
@@ -75,7 +76,6 @@ function EtappenUebergangScreen({
       </p>
 
       <div className="w-full max-w-[340px] flex flex-col gap-4">
-        {/* Alte Etappe – fades up */}
         <div
           style={{
             opacity: phase >= 1 ? 0 : 1,
@@ -94,7 +94,6 @@ function EtappenUebergangScreen({
           </div>
         </div>
 
-        {/* Neue Etappe – fades in */}
         <div
           style={{
             opacity: phase >= 1 ? 1 : 0,
@@ -139,6 +138,9 @@ type PageState =
   | { kind: 'loading' }
   | { kind: 'ready'; lesson: Lesson }
   | { kind: 'error' }
+  | { kind: 'spiel_bild_matching' }
+  | { kind: 'spiel_wort_paare' }
+  | { kind: 'spiel_reihenfolge' }
 
 const BACK_BTN =
   'text-muted text-sm tap-scale self-start mb-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded'
@@ -153,8 +155,10 @@ export default function Lektion() {
   const [searchParams] = useSearchParams()
   const [abschluss, setAbschluss] = useState(false)
   const [fadingOut, setFadingOut] = useState(false)
+  const [nochEine, setNochEine] = useState(false)
   const [erzaehlInput, setErzaehlInput] = useState('')
   const [etappenUebergang, setEtappenUebergang] = useState<{ von: Etappe; zu: Etappe } | null>(null)
+  const [reviewableCount, setReviewableCount] = useState(0)
 
   const rawMode = searchParams.get('mode')
   const mode: EnergyMode | null =
@@ -210,13 +214,18 @@ export default function Lektion() {
     void loadLektion(mode)
   }, [mode, loadLektion])
 
-  // Abschluss timing: 1800ms total, fade-out starts at 1600ms
+  // Abschluss: show for 1.8s then show "Noch eine?" screen
   useEffect(() => {
     if (!abschluss) return
     const t1 = setTimeout(() => setFadingOut(true), 1600)
-    const t2 = setTimeout(() => navigate('/heute', { replace: true }), 1800)
+    const t2 = setTimeout(() => {
+      setFadingOut(false)
+      setAbschluss(false)
+      setNochEine(true)
+      setReviewableCount(getReviewableCount())
+    }, 1800)
     return () => { clearTimeout(t1); clearTimeout(t2) }
-  }, [abschluss, navigate])
+  }, [abschluss])
 
   const handleWeiter = useCallback(() => {
     navigate('/heute', { replace: true })
@@ -224,7 +233,9 @@ export default function Lektion() {
 
   const handleFinish = useCallback(() => {
     if (pageState.kind === 'ready') {
-      addSeenVocab(extractVocab(pageState.lesson))
+      const vocab = extractVocab(pageState.lesson)
+      addSeenVocab(vocab)
+      recordVocabSeen(vocab)
     }
     if (mode) addCompletedModeToday(mode)
 
@@ -237,6 +248,43 @@ export default function Lektion() {
       setAbschluss(true)
     }
   }, [pageState, mode])
+
+  // After lesson, check if we should route to a mini-game (phase-based)
+  const handleFinishWithGame = useCallback(() => {
+    if (pageState.kind !== 'ready') { handleFinish(); return }
+
+    const phase = getAnfaengerPhase()
+    if (phase === 'phase1' && mode === 'okay') {
+      // Record vocab first, then show SpielBildMatching
+      const vocab = extractVocab(pageState.lesson)
+      addSeenVocab(vocab)
+      recordVocabSeen(vocab)
+      if (mode) addCompletedModeToday(mode)
+      incrementLektionenInEtappe()
+      setPageState({ kind: 'spiel_bild_matching' })
+      return
+    }
+    if (phase === 'phase1' && mode === 'fit') {
+      const vocab = extractVocab(pageState.lesson)
+      addSeenVocab(vocab)
+      recordVocabSeen(vocab)
+      if (mode) addCompletedModeToday(mode)
+      incrementLektionenInEtappe()
+      setPageState({ kind: 'spiel_wort_paare' })
+      return
+    }
+    if (phase === 'phase2' && mode === 'okay') {
+      const vocab = extractVocab(pageState.lesson)
+      addSeenVocab(vocab)
+      recordVocabSeen(vocab)
+      if (mode) addCompletedModeToday(mode)
+      incrementLektionenInEtappe()
+      setPageState({ kind: 'spiel_reihenfolge' })
+      return
+    }
+
+    handleFinish()
+  }, [pageState, mode, handleFinish])
 
   // ─── Etappen-Übergang ─────────────────────────────────────────────────────
   if (etappenUebergang) {
@@ -259,6 +307,43 @@ export default function Lektion() {
     )
   }
 
+  // ─── Mini-game screens (phase-based) ───────────────────────────────────────
+  if (pageState.kind === 'spiel_bild_matching') {
+    const anfaengerVocab = ANFAENGER_VOKABULAR.slice().sort(() => Math.random() - 0.5).slice(0, 8)
+    return (
+      <div className={PAGE_WRAP}>
+        <SpielBildMatching
+          vocab={anfaengerVocab}
+          onFinish={() => setAbschluss(true)}
+        />
+      </div>
+    )
+  }
+
+  if (pageState.kind === 'spiel_wort_paare') {
+    const anfaengerVocab = ANFAENGER_VOKABULAR.slice().sort(() => Math.random() - 0.5).slice(0, 6)
+    return (
+      <div className={PAGE_WRAP}>
+        <SpielWortPaare
+          vocab={anfaengerVocab}
+          onFinish={() => setAbschluss(true)}
+        />
+      </div>
+    )
+  }
+
+  if (pageState.kind === 'spiel_reihenfolge') {
+    const user = getUser()
+    return (
+      <div className={PAGE_WRAP}>
+        <SpielReihenfolge
+          etappe={user?.etappe ?? 1}
+          onFinish={() => setAbschluss(true)}
+        />
+      </div>
+    )
+  }
+
   // ─── abschluss screen ──────────────────────────────────────────────────────
   if (abschluss) {
     const lesson = pageState.kind === 'ready' ? pageState.lesson : null
@@ -275,6 +360,26 @@ export default function Lektion() {
           <p className="text-[18px] text-muted text-center">{keyword.de}</p>
         )}
         <p className="absolute bottom-10 text-sm text-muted">{signOff}</p>
+      </div>
+    )
+  }
+
+  // ─── Noch eine? screen ─────────────────────────────────────────────────────
+  if (nochEine) {
+    return (
+      <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#FAF7F2] to-[#F5F1EB] items-center justify-center px-8 gap-4 fade-in">
+        <p className="font-serif text-[28px] font-semibold text-text text-center">Gut gemacht.</p>
+        <p className="text-[15px] text-muted text-center">Noch eine Runde?</p>
+        <div className="flex flex-col gap-3 w-full max-w-[320px] mt-4">
+          {reviewableCount >= 5 && (
+            <Button variant="secondary" fullWidth onClick={() => navigate('/wiederholen')}>
+              Vokabeln wiederholen
+            </Button>
+          )}
+          <Button variant="primary" fullWidth onClick={() => navigate('/heute', { replace: true })}>
+            Zurück zur Übersicht
+          </Button>
+        </div>
       </div>
     )
   }
@@ -361,7 +466,7 @@ export default function Lektion() {
   return (
     <div className={PAGE_WRAP}>
       {backBtn}
-      <LessonView lesson={pageState.lesson} onFinish={handleFinish} />
+      <LessonView lesson={pageState.lesson} onFinish={handleFinishWithGame} />
     </div>
   )
 }

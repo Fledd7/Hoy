@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, Zap, Flame, MessageCircle } from 'lucide-react'
+import { BookOpen, Zap, Flame, MessageCircle, RotateCcw, Sparkles } from 'lucide-react'
 import ProfileIcon from '../components/ProfileIcon'
 import EnergyButton from '../components/EnergyButton'
 import ReturnBanner from '../components/ReturnBanner'
@@ -12,14 +12,16 @@ import {
   ensureEtappenMigration,
   getUser,
 } from '../lib/storage'
+import { getReviewableCount } from '../lib/vocabTracking'
+import { getAnfaengerPhase, getDayInPfad, getModusKonfiguration, isErzaehlModusVerfuegbar } from '../lib/anfaengerPfad'
 import { ETAPPEN } from '../lib/etappen'
 import type { EnergyMode, UserData } from '../lib/types'
 
-const ENERGIE_BUTTONS: { mode: EnergyMode; label: string; sublabel: string; icon: ReactNode }[] = [
-  { mode: 'muede',   label: 'Müde',          sublabel: 'Kurzer Lese-Snack, 2 Minuten',  icon: <BookOpen size={22} /> },
-  { mode: 'okay',    label: 'Okay',           sublabel: 'Lektion mit Verständnisfragen', icon: <Zap size={22} /> },
-  { mode: 'fit',     label: 'Fit',            sublabel: 'Dialog + Vokabeln, zwei Teile', icon: <Flame size={22} /> },
-  { mode: 'erzaehl', label: 'Erzähl mir was', sublabel: 'Dein Tag auf Spanisch',         icon: <MessageCircle size={22} /> },
+const BASE_BUTTONS: { mode: EnergyMode; label: string; icon: ReactNode }[] = [
+  { mode: 'muede',   label: 'Müde',          icon: <BookOpen size={22} /> },
+  { mode: 'okay',    label: 'Okay',           icon: <Zap size={22} /> },
+  { mode: 'fit',     label: 'Fit',            icon: <Flame size={22} /> },
+  { mode: 'erzaehl', label: 'Erzähl mir was', icon: <MessageCircle size={22} /> },
 ]
 
 const WEEKDAYS = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag']
@@ -60,6 +62,7 @@ export default function Heute() {
   const [greeting] = useState(pickGreeting)
   const [doneToday, setDoneToday] = useState<Set<EnergyMode>>(new Set())
   const [user, setUser] = useState<UserData | null>(null)
+  const [reviewableCount, setReviewableCount] = useState(0)
 
   useEffect(() => {
     if (!isOnboardingDone()) {
@@ -72,6 +75,7 @@ export default function Heute() {
     updateLetztesOeffnen()
     setDoneToday(getCompletedModesToday())
     setUser(getUser())
+    setReviewableCount(getReviewableCount())
   }, [navigate])
 
   function handleEnergySelect(mode: EnergyMode) {
@@ -80,6 +84,11 @@ export default function Heute() {
 
   const etappe = user?.etappe !== undefined ? ETAPPEN[user.etappe - 1] : null
   const lektionen = Math.min(user?.lektionenInEtappe ?? 0, 10)
+
+  const phase = getAnfaengerPhase()
+  const erzaehlVerfuegbar = isErzaehlModusVerfuegbar()
+  const dayInPfad = getDayInPfad()
+  const showPfadHint = phase === 'phase1' || phase === 'phase2'
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#FAF7F2] to-[#F5F1EB]">
@@ -124,6 +133,19 @@ export default function Heute() {
           </button>
         )}
 
+        {/* Anfänger-Pfad Hinweis */}
+        {showPfadHint && (
+          <div
+            className="mb-5 flex items-center gap-2 px-4 py-3 rounded-[12px]"
+            style={{ backgroundColor: '#FFF4E6', border: '1px solid rgba(194,130,61,0.2)' }}
+          >
+            <Sparkles size={15} color="#C2813D" />
+            <p className="text-[13px] text-[#7A4E1A]">
+              Tag {dayInPfad} von 14 – {phase === 'phase1' ? 'Erste Schritte' : 'Weiter geht\'s'}
+            </p>
+          </div>
+        )}
+
         <div className="mb-12">
           <p
             className="text-[13px] text-muted mb-3"
@@ -138,17 +160,49 @@ export default function Heute() {
         <ReturnBanner visible={showBanner} />
 
         <div className="flex flex-col gap-3">
-          {ENERGIE_BUTTONS.map((btn, idx) => (
-            <div key={btn.mode} className="enter-up" style={{ animationDelay: `${idx * 80}ms` }}>
-              <EnergyButton
-                label={btn.label}
-                sublabel={btn.sublabel}
-                icon={btn.icon}
-                doneToday={doneToday.has(btn.mode)}
-                onClick={() => handleEnergySelect(btn.mode)}
-              />
-            </div>
-          ))}
+          {BASE_BUTTONS.map((btn, idx) => {
+            const config = getModusKonfiguration(btn.mode, phase)
+            const isErzaehl = btn.mode === 'erzaehl'
+            const disabled = isErzaehl && !erzaehlVerfuegbar
+            return (
+              <div key={btn.mode} className="enter-up" style={{ animationDelay: `${idx * 80}ms` }}>
+                <EnergyButton
+                  label={btn.label}
+                  sublabel={config.sublabel}
+                  icon={btn.icon}
+                  doneToday={doneToday.has(btn.mode)}
+                  onClick={() => !disabled && handleEnergySelect(btn.mode)}
+                  disabled={disabled}
+                />
+              </div>
+            )
+          })}
+
+          {/* Wiederholen-Button */}
+          <div className="enter-up" style={{ animationDelay: `${BASE_BUTTONS.length * 80}ms` }}>
+            <button
+              onClick={() => navigate('/wiederholen')}
+              disabled={reviewableCount < 5}
+              className="w-full flex items-center gap-3 px-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-[16px] tap-scale"
+              style={{
+                height: 72,
+                background: 'rgba(255,255,255,0.4)',
+                border: '1.5px dashed #C0BAB4',
+                borderRadius: 16,
+                opacity: reviewableCount < 5 ? 0.5 : 1,
+              }}
+            >
+              <RotateCcw size={20} color="#9B9B9B" />
+              <div className="flex-1 text-left">
+                <p className="text-[15px] font-semibold text-text leading-tight">Wiederholen</p>
+                <p className="text-[12px] text-muted">
+                  {reviewableCount < 5
+                    ? 'Noch zu wenig Vokabeln'
+                    : `${reviewableCount} Vokabeln bereit`}
+                </p>
+              </div>
+            </button>
+          </div>
         </div>
 
       </div>

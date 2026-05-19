@@ -9,6 +9,7 @@ interface EnergyButtonProps {
   doneToday?: boolean
   recommended?: boolean
   recommendedNote?: string
+  disabled?: boolean
 }
 
 export default function EnergyButton({
@@ -19,8 +20,10 @@ export default function EnergyButton({
   doneToday = false,
   recommended = false,
   recommendedNote,
+  disabled = false,
 }: EnergyButtonProps) {
   function handleClick() {
+    if (disabled) return
     navigator.vibrate?.(10)
     onClick()
   }
@@ -29,7 +32,8 @@ export default function EnergyButton({
     <div>
       <button
         onClick={handleClick}
-        className="w-full min-h-[88px] bg-white rounded-[18px] px-5 py-4 text-left tap-lift focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 flex items-center gap-4"
+        disabled={disabled}
+        className="w-full min-h-[88px] bg-white rounded-[18px] px-5 py-4 text-left tap-lift focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 flex items-center gap-4 disabled:opacity-40 disabled:cursor-not-allowed"
         style={{
           boxShadow: recommended
             ? '0 0 0 2px rgba(194,85,61,0.15), 0 1px 2px rgba(26,26,26,0.04), 0 4px 16px rgba(26,26,26,0.06), 0 12px 32px rgba(26,26,26,0.04)'

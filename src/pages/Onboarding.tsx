@@ -44,6 +44,7 @@ export default function Onboarding() {
 
   function handleFinish() {
     if (!niveau) return
+    const isAnfaenger = niveau === 'anfaenger'
     saveUser({
       niveau,
       themen,
@@ -52,6 +53,8 @@ export default function Onboarding() {
       letztesOeffnen: new Date().toISOString(),
       etappe: etappeForNiveau(niveau),
       lektionenInEtappe: 0,
+      anfaengerPfadStart: isAnfaenger ? new Date().toISOString() : null,
+      anfaengerPfadAktiv: isAnfaenger,
     })
     navigate('/heute', { replace: true })
   }

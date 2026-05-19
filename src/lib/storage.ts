@@ -1,5 +1,6 @@
 import type { UserData, LessonHistoryItem, EnergyMode } from './types';
 import { etappeForNiveau } from './etappen';
+import { VOCAB_TRACKING_STORAGE_KEY } from './vocabTracking';
 
 const USER_KEY = 'hoy_user';
 const LESSON_CACHE_KEY = 'hoy_lessonCache';
@@ -44,6 +45,7 @@ export function resetAll(): void {
   localStorage.removeItem(COMPLETED_LESSONS_KEY);
   localStorage.removeItem(COMPLETED_MODES_KEY);
   localStorage.removeItem(LESSON_HISTORY_KEY);
+  localStorage.removeItem(VOCAB_TRACKING_STORAGE_KEY);
 }
 
 export function isOnboardingDone(): boolean {

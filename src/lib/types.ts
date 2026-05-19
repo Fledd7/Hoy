@@ -6,6 +6,8 @@ export interface UserData {
   letztesOeffnen: string;
   etappe?: 1 | 2 | 3 | 4 | 5;
   lektionenInEtappe?: number;
+  anfaengerPfadStart?: string | null;
+  anfaengerPfadAktiv?: boolean;
 }
 
 export type EnergyMode = 'muede' | 'okay' | 'fit' | 'erzaehl';
@@ -20,6 +22,7 @@ export interface TiredLesson {
   text: string;
   translation: string;
   vocab: VocabItem[];
+  schluesselwort?: VocabItem;
 }
 
 export interface OkayLesson {
@@ -27,6 +30,7 @@ export interface OkayLesson {
   text: string;
   translation: string;
   questions: QuizQuestion[];
+  schluesselwort?: VocabItem;
 }
 
 export interface QuizQuestion {
@@ -45,12 +49,14 @@ export interface FitLesson {
   mode: 'fit';
   dialog: DialogLine[];
   vocab: VocabItem[];
+  schluesselwort?: VocabItem;
 }
 
 export interface ErzaehlLesson {
   mode: 'erzaehl';
   saetze: { es: string; de: string }[];
   vocab: VocabItem[];
+  schluesselwort?: VocabItem;
 }
 
 export type Lesson = TiredLesson | OkayLesson | FitLesson | ErzaehlLesson;
@@ -60,4 +66,3 @@ export interface LessonHistoryItem {
   modus: EnergyMode;
   content: Lesson;
 }
-

@@ -61,7 +61,11 @@ function dummyForMode(modus: EnergyMode): Lesson {
 
 // ─── API response types ───────────────────────────────────────────────────────
 
-interface MuedeResponse {
+interface WithSchluesselwort {
+  schluesselwort?: { es: string; de: string }
+}
+
+interface MuedeResponse extends WithSchluesselwort {
   text_es: string
   text_de: string
   vokabeln: VocabItem[]
@@ -73,7 +77,7 @@ interface OkayFrage {
   richtig: number
 }
 
-interface OkayResponse {
+interface OkayResponse extends WithSchluesselwort {
   text_es: string
   text_de: string
   fragen: OkayFrage[]
@@ -85,21 +89,26 @@ interface FitDialogLine {
   de: string
 }
 
-interface FitResponse {
+interface FitResponse extends WithSchluesselwort {
   dialog: FitDialogLine[]
   vokabeln: VocabItem[]
 }
 
-interface ErzaehlResponse {
+interface ErzaehlResponse extends WithSchluesselwort {
   saetze: { es: string; de: string }[]
   vokabeln: VocabItem[]
+}
+
+function extractSchluesselwort(raw: WithSchluesselwort): VocabItem | undefined {
+  if (raw.schluesselwort?.es && raw.schluesselwort?.de) return raw.schluesselwort
+  return undefined
 }
 
 function mapToLesson(modus: EnergyMode, raw: unknown): Lesson {
   if (modus === 'muede') {
     const d = raw as MuedeResponse
     if (!d.text_es || !d.text_de || !Array.isArray(d.vokabeln)) throw new Error('invalid muede')
-    return { mode: 'muede', text: d.text_es, translation: d.text_de, vocab: d.vokabeln }
+    return { mode: 'muede', text: d.text_es, translation: d.text_de, vocab: d.vokabeln, schluesselwort: extractSchluesselwort(d) }
   }
   if (modus === 'okay') {
     const d = raw as OkayResponse
@@ -109,6 +118,7 @@ function mapToLesson(modus: EnergyMode, raw: unknown): Lesson {
       text: d.text_es,
       translation: d.text_de,
       questions: d.fragen.map(f => ({ question: f.frage, options: f.antworten, correctIndex: f.richtig })),
+      schluesselwort: extractSchluesselwort(d),
     }
   }
   if (modus === 'fit') {
@@ -118,12 +128,13 @@ function mapToLesson(modus: EnergyMode, raw: unknown): Lesson {
       mode: 'fit',
       dialog: d.dialog.map(l => ({ speaker: l.sprecher, es: l.es, de: l.de })),
       vocab: d.vokabeln,
+      schluesselwort: extractSchluesselwort(d),
     }
   }
   // erzaehl
   const d = raw as ErzaehlResponse
   if (!Array.isArray(d.saetze) || !Array.isArray(d.vokabeln)) throw new Error('invalid erzaehl')
-  return { mode: 'erzaehl', saetze: d.saetze, vocab: d.vokabeln }
+  return { mode: 'erzaehl', saetze: d.saetze, vocab: d.vokabeln, schluesselwort: extractSchluesselwort(d) }
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
