@@ -48,6 +48,18 @@ export default function SpielLueckenFuellen({ vocab, etappe, onFinish }: Props) 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const handleNochmal = useCallback(() => {
+    setIndex(0)
+    setCorrect(0)
+    setDone(false)
+  }, [])
+
+  useEffect(() => {
+    if (!done) return
+    const t = setTimeout(onFinish, 8000)
+    return () => clearTimeout(t)
+  }, [done, onFinish])
+
   if (loading) {
     return (
       <div className="flex flex-col gap-4 pt-2">
@@ -66,18 +78,6 @@ export default function SpielLueckenFuellen({ vocab, etappe, onFinish }: Props) 
       </div>
     )
   }
-
-  const handleNochmal = useCallback(() => {
-    setIndex(0)
-    setCorrect(0)
-    setDone(false)
-  }, [])
-
-  useEffect(() => {
-    if (!done) return
-    const t = setTimeout(onFinish, 8000)
-    return () => clearTimeout(t)
-  }, [done, onFinish])
 
   if (done) {
     return (

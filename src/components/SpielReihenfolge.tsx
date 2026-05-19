@@ -47,6 +47,12 @@ export default function SpielReihenfolge({ etappe, onFinish }: Props) {
     return () => controller.abort()
   }, [etappe])
 
+  useEffect(() => {
+    if (!done) return
+    const t = setTimeout(onFinish, 8000)
+    return () => clearTimeout(t)
+  }, [done, onFinish])
+
   if (loading) {
     return (
       <div className="flex flex-col gap-4 pt-2">
@@ -65,12 +71,6 @@ export default function SpielReihenfolge({ etappe, onFinish }: Props) {
       </div>
     )
   }
-
-  useEffect(() => {
-    if (!done) return
-    const t = setTimeout(onFinish, 8000)
-    return () => clearTimeout(t)
-  }, [done, onFinish])
 
   function handleNochmal() {
     setIndex(0)
