@@ -14,6 +14,7 @@ import { fetchLektion, clearModeCache } from '../lib/api'
 import { ETAPPEN } from '../lib/etappen'
 import type { Etappe } from '../lib/etappen'
 import type { EnergyMode, Lesson } from '../lib/types'
+import { recordVocabSeen } from '../lib/vocabTracking'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -34,14 +35,9 @@ function extractVocab(lesson: Lesson): { es: string; de: string }[] {
 }
 
 function extractKeyword(lesson: Lesson): { es: string; de: string } | null {
-  if (lesson.mode === 'muede') return lesson.vocab[0] ?? null
-  if (lesson.mode === 'fit')   return lesson.vocab[0] ?? null
-  if (lesson.mode === 'erzaehl') return lesson.vocab[0] ?? null
-  const stop = new Set(['el','la','los','las','un','una','en','de','a','y','que',
-    'se','su','con','por','para','es','ha','al','del','su','lo'])
-  const words = lesson.text.split(/[\s,.:;!?'"()]+/)
-  const word = words.find(w => w.length > 4 && !stop.has(w.toLowerCase()))
-  return word ? { es: word, de: '' } : null
+  if (lesson.schluesselwort) return lesson.schluesselwort
+  if (lesson.mode !== 'okay') return lesson.vocab[0] ?? null
+  return null
 }
 
 // ─── Etappen-Übergangs-Screen ─────────────────────────────────────────────────
@@ -224,7 +220,9 @@ export default function Lektion() {
 
   const handleFinish = useCallback(() => {
     if (pageState.kind === 'ready') {
-      addSeenVocab(extractVocab(pageState.lesson))
+      const vocab = extractVocab(pageState.lesson)
+      addSeenVocab(vocab)
+      vocab.forEach(v => recordVocabSeen(v.es, v.de))
     }
     if (mode) addCompletedModeToday(mode)
 

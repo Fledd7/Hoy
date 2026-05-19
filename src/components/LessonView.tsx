@@ -1,8 +1,10 @@
 import { useRef, useState } from 'react'
-import type { Lesson, QuizQuestion } from '../lib/types'
+import type { Lesson, QuizQuestion, VocabItem } from '../lib/types'
 import VocabTap from './VocabTap'
 import Button from './Button'
 import Card from './Card'
+import { getVocabLevel, getAllTrackedVocab, recordVocabAnswer } from '../lib/vocabTracking'
+import { isCloseMatch } from '../lib/stringUtils'
 
 interface LessonViewProps {
   lesson: Lesson
@@ -94,22 +96,286 @@ function LineChevron({ open, onToggle, label }: { open: boolean; onToggle: () =>
   )
 }
 
+// ─── Vocab distractor helper ─────────────────────────────────────────────────
+
+const FALLBACK_DISTRACTORS = ['casa', 'agua', 'tiempo', 'bueno', 'amigo', 'trabajar', 'comer', 'hablar']
+
+function getDistractors(correctEs: string): [string, string] {
+  const tracking = getAllTrackedVocab()
+  const pool = Object.values(tracking)
+    .filter(e => e.es !== correctEs)
+    .map(e => e.es)
+
+  const result: string[] = []
+  const available = [...pool]
+  while (result.length < 2 && available.length > 0) {
+    const idx = Math.floor(Math.random() * available.length)
+    result.push(available[idx])
+    available.splice(idx, 1)
+  }
+
+  let fi = 0
+  while (result.length < 2 && fi < FALLBACK_DISTRACTORS.length) {
+    const w = FALLBACK_DISTRACTORS[fi]
+    if (w !== correctEs && !result.includes(w)) result.push(w)
+    fi++
+  }
+
+  return [result[0] ?? 'algo', result[1] ?? 'nada']
+}
+
+// ─── Tired Mode Vocab Cards ───────────────────────────────────────────────────
+
+function FlipCard({ item, onNext, isLast, onFinish }: { item: VocabItem; onNext: () => void; isLast: boolean; onFinish: () => void }) {
+  const [flipped, setFlipped] = useState(false)
+
+  return (
+    <div className="flex flex-col gap-4 fade-in">
+      <div
+        className="cursor-pointer select-none"
+        style={{ perspective: '1000px' }}
+        onClick={() => { if (!flipped) { navigator.vibrate?.(8); setFlipped(true) } }}
+      >
+        <div
+          className="relative min-h-[180px]"
+          style={{
+            transformStyle: 'preserve-3d',
+            transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+            transition: 'transform 350ms ease-out',
+          }}
+        >
+          <div
+            className="bg-white rounded-[20px] border border-[#E2D7C8]/50 px-6 py-10 min-h-[180px] flex flex-col items-center justify-center shadow-card"
+            style={{ backfaceVisibility: 'hidden' }}
+          >
+            <p className="text-2xl font-semibold text-text text-center">{item.es}</p>
+            <p className="text-xs text-muted mt-3">Tippe zum Aufdecken</p>
+          </div>
+          <div
+            className="absolute inset-0 bg-white rounded-[20px] border border-[#E2D7C8]/50 px-6 py-10 flex flex-col items-center justify-center shadow-card"
+            style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+          >
+            <p className="text-sm text-muted text-center mb-2">{item.es}</p>
+            <p className="text-2xl font-semibold text-text text-center">{item.de}</p>
+          </div>
+        </div>
+      </div>
+      {flipped && (
+        <Button
+          variant={isLast ? 'primary' : 'secondary'}
+          fullWidth
+          onClick={isLast ? onFinish : onNext}
+        >
+          {isLast ? 'Fertig' : 'Weiter →'}
+        </Button>
+      )}
+    </div>
+  )
+}
+
+function McqVocabCard({ item, onNext, isLast, onFinish }: { item: VocabItem; onNext: () => void; isLast: boolean; onFinish: () => void }) {
+  const [distractors] = useState(() => getDistractors(item.es))
+  const [options] = useState<string[]>(() => {
+    const opts = [item.es, distractors[0], distractors[1]]
+    for (let i = opts.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [opts[i], opts[j]] = [opts[j], opts[i]]
+    }
+    return opts
+  })
+  const [selected, setSelected] = useState<number | null>(null)
+
+  const answered = selected !== null
+
+  function handleSelect(idx: number) {
+    if (answered) return
+    const correct = options[idx] === item.es
+    navigator.vibrate?.(correct ? 10 : 5)
+    setSelected(idx)
+    recordVocabAnswer(item.es, correct)
+  }
+
+  return (
+    <Card className="fade-in flex flex-col gap-4">
+      <p className="text-[13px] text-muted uppercase tracking-wide">Wie heißt das auf Spanisch?</p>
+      <p className="text-xl font-semibold text-text">{item.de}</p>
+      <div className="flex flex-col gap-2">
+        {options.map((opt, idx) => {
+          const isCorrect = opt === item.es
+          let style = 'border border-[#E0DDD8] text-text'
+          if (answered) {
+            if (isCorrect) style = 'border-2 border-accent text-accent bg-[#FBF0EE]'
+            else if (idx === selected) style = 'border border-[#E0DDD8] text-muted line-through'
+          } else if (idx === selected) {
+            style = 'border-2 border-accent text-accent bg-[#FBF0EE]'
+          }
+          return (
+            <button
+              key={idx}
+              onClick={() => handleSelect(idx)}
+              className={`w-full text-left px-4 py-3 rounded-btn text-sm tap-scale ${style} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
+            >
+              {opt}
+            </button>
+          )
+        })}
+      </div>
+      {answered && (
+        <Button
+          variant={isLast ? 'primary' : 'secondary'}
+          fullWidth
+          onClick={isLast ? onFinish : onNext}
+        >
+          {isLast ? 'Fertig' : 'Weiter →'}
+        </Button>
+      )}
+    </Card>
+  )
+}
+
+function TypeVocabCard({ item, onNext, isLast, onFinish }: { item: VocabItem; onNext: () => void; isLast: boolean; onFinish: () => void }) {
+  const [input, setInput] = useState('')
+  const [result, setResult] = useState<'correct' | 'close' | 'wrong' | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const targetBase = stripArticle(item.es)
+
+  function handleSubmit() {
+    if (!input.trim()) return
+    const trimmed = input.trim()
+    const exact = isCloseMatch(trimmed, item.es) || isCloseMatch(trimmed, targetBase)
+    const close = !exact && (
+      isCloseMatch(trimmed, item.es.split(' ').pop() ?? item.es) ||
+      isCloseMatch(trimmed, targetBase.split(' ').pop() ?? targetBase)
+    )
+    const res = exact ? 'correct' : close ? 'close' : 'wrong'
+    setResult(res)
+    recordVocabAnswer(item.es, res === 'correct' || res === 'close')
+    navigator.vibrate?.(res === 'correct' ? 10 : 5)
+  }
+
+  return (
+    <Card className="fade-in flex flex-col gap-4">
+      <p className="text-[13px] text-muted uppercase tracking-wide">Wie heißt das auf Spanisch?</p>
+      <p className="text-xl font-semibold text-text">{item.de}</p>
+      {result === null ? (
+        <>
+          <input
+            ref={inputRef}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleSubmit() }}
+            placeholder="Auf Spanisch tippen…"
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
+            className="w-full bg-white border border-[#E0DDD8] rounded-btn px-4 py-3 text-base text-text placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
+          />
+          <Button variant="primary" fullWidth onClick={handleSubmit} disabled={!input.trim()}>
+            Prüfen
+          </Button>
+        </>
+      ) : (
+        <>
+          <div className={`rounded-btn px-4 py-3 text-sm font-medium ${result === 'correct' ? 'bg-[#FBF0EE] text-accent border border-accent/30' : result === 'close' ? 'bg-[#FBF0EE] text-accent border border-accent/30' : 'bg-[#F5F1EB] text-muted border border-[#E0DDD8]'}`}>
+            {result === 'correct' && <span>Richtig: <span className="font-semibold">{item.es}</span></span>}
+            {result === 'close' && <span>Fast! Die Antwort: <span className="font-semibold">{item.es}</span></span>}
+            {result === 'wrong' && <span>Die Antwort: <span className="font-semibold text-text">{item.es}</span></span>}
+          </div>
+          <Button
+            variant={isLast ? 'primary' : 'secondary'}
+            fullWidth
+            onClick={isLast ? onFinish : onNext}
+          >
+            {isLast ? 'Fertig' : 'Weiter →'}
+          </Button>
+        </>
+      )}
+    </Card>
+  )
+}
+
+function TiredVocabStep({ vocab, onFinish }: { vocab: VocabItem[]; onFinish: () => void }) {
+  const [index, setIndex] = useState(0)
+
+  if (vocab.length === 0) {
+    return (
+      <Button variant="primary" fullWidth onClick={onFinish}>
+        Fertig
+      </Button>
+    )
+  }
+
+  if (index >= vocab.length) {
+    return (
+      <div className="flex flex-col gap-3 fade-in">
+        <p className="text-xs text-muted text-center">Alle Vokabeln durch</p>
+        <Button variant="primary" fullWidth onClick={() => { navigator.vibrate?.(10); onFinish() }}>
+          Fertig
+        </Button>
+      </div>
+    )
+  }
+
+  const item = vocab[index]
+  const level = getVocabLevel(item.es)
+  const isLast = index === vocab.length - 1
+  const cardProps = { item, onNext: () => setIndex(i => i + 1), isLast, onFinish }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex justify-center gap-1.5 items-center">
+        {vocab.map((_, i) => (
+          <span
+            key={i}
+            className={`rounded-full transition-all duration-200 ${
+              i === index ? 'w-5 h-2 bg-accent' : i < index ? 'w-2 h-2 bg-[#C2553D]/30' : 'w-2 h-2 bg-[#E0DDD8]'
+            }`}
+          />
+        ))}
+      </div>
+      {level === 'vertraut' ? (
+        <TypeVocabCard {...cardProps} />
+      ) : level === 'lerntief' ? (
+        <McqVocabCard {...cardProps} />
+      ) : (
+        <FlipCard {...cardProps} />
+      )}
+    </div>
+  )
+}
+
 // ─── Views ───────────────────────────────────────────────────────────────────
 
 function TiredView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'muede' }>; onFinish: () => void }) {
+  const [step, setStep] = useState<1 | 2>(1)
   const [showTranslation, setShowTranslation] = useState(false)
   const truncatedText = truncateToTwoSentences(lesson.text)
   const truncatedTranslation = truncateToTwoSentences(lesson.translation)
   const segments = splitTextWithVocab(truncatedText, lesson.vocab)
+  const hasVocab = lesson.vocab.length > 0
 
-  function handleFinish() {
-    navigator.vibrate?.(10)
-    onFinish()
+  if (step === 2) {
+    return (
+      <div className="fade-in flex flex-col gap-6">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-xs font-semibold text-accent uppercase tracking-wide">Schritt 2 von 2</span>
+          <span className="text-xs text-muted">Vokabeln</span>
+        </div>
+        <TiredVocabStep vocab={lesson.vocab} onFinish={onFinish} />
+      </div>
+    )
   }
 
   return (
     <div className="fade-in flex flex-col gap-6">
       <div>
+        {hasVocab && (
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-semibold text-accent uppercase tracking-wide">Schritt 1 von 2</span>
+            <span className="text-xs text-muted">Text</span>
+          </div>
+        )}
         <h2 className="text-[20px] text-text font-semibold">Heute ganz leicht</h2>
         <p className="text-[14px] text-muted mt-1">
           Lies den Text. Tippe auf markierte Wörter für die Übersetzung.
@@ -134,19 +400,15 @@ function TiredView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'mued
       <Button
         variant="primary"
         fullWidth
-        onClick={handleFinish}
+        onClick={hasVocab ? () => setStep(2) : onFinish}
         className="enter-up"
         style={{ animationDelay: '120ms' }}
       >
-        Reicht für heute
+        {hasVocab ? 'Weiter zu den Vokabeln' : 'Reicht für heute'}
       </Button>
     </div>
   )
 }
-
-// ─── MCQ micro-reward constants ───────────────────────────────────────────────
-
-const CORRECT_TEXTS = ['¡bien!', '¡perfecto!', '¡muy bien!', '¡exacto!', '¡eso es!']
 
 function OkayView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'okay' }>; onFinish: () => void }) {
   const [answers, setAnswers] = useState<Record<number, number>>({})
@@ -215,30 +477,22 @@ function QuizCard({
   onSelect: (idx: number) => void
   style?: React.CSSProperties
 }) {
-  const [microReward, setMicroReward] = useState<{ idx: number; text: string; isCorrect: boolean } | null>(null)
-
   function handleOptionClick(idx: number) {
+    if (checked) return
+    navigator.vibrate?.(8)
     onSelect(idx)
-    if (checked || microReward !== null) return
-    const isCorrect = idx === question.correctIndex
-    navigator.vibrate?.(isCorrect ? 10 : 5)
-    const text = isCorrect ? CORRECT_TEXTS[Math.floor(Math.random() * CORRECT_TEXTS.length)] : ''
-    setMicroReward({ idx, text, isCorrect })
-    setTimeout(() => setMicroReward(null), isCorrect ? 600 : 400)
   }
 
   return (
-    <Card className="enter-up relative overflow-visible" style={style}>
+    <Card className="enter-up" style={style}>
       <p className="text-base font-medium text-text mb-3">{question.question}</p>
       <div className="flex flex-col gap-2">
         {question.options.map((opt, idx) => {
           let optStyle = 'border border-[#E0DDD8] text-text'
-          let extraClass = ''
 
           if (checked) {
             if (idx === question.correctIndex) {
-              optStyle = 'border-2 border-accent text-accent bg-[#FBF0EE]'
-              extraClass = 'correct-glow'
+              optStyle = 'border-2 border-accent text-accent bg-[#FBF0EE] correct-glow'
             } else if (idx === selected) {
               optStyle = 'border border-[#E0DDD8] text-muted line-through'
             }
@@ -246,31 +500,17 @@ function QuizCard({
             optStyle = 'border-2 border-accent text-accent bg-[#FBF0EE]'
           }
 
-          // Micro-reward overlay styles (before auswerten)
-          if (!checked && microReward?.idx === idx) {
-            if (microReward.isCorrect) {
-              extraClass += ' correct-glow'
-            } else {
-              extraClass += ' wrong-flash'
-            }
-          }
-
           return (
             <button
               key={idx}
               onClick={() => handleOptionClick(idx)}
-              className={`w-full text-left px-4 py-3 rounded-btn text-sm tap-scale ${optStyle} ${extraClass} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
+              className={`w-full text-left px-4 py-3 rounded-btn text-sm tap-scale ${optStyle} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
             >
               {opt}
             </button>
           )
         })}
       </div>
-      {microReward?.isCorrect && (
-        <span className="bubble-in absolute -top-3 right-3 z-10 bg-accent text-white text-[12px] font-semibold px-3 py-1 rounded-full pointer-events-none whitespace-nowrap shadow-[0_2px_8px_rgba(194,85,61,0.4)]">
-          {microReward.text}
-        </span>
-      )}
     </Card>
   )
 }
@@ -329,70 +569,43 @@ function FitDialogCard({ dialog }: { dialog: { speaker: string; es: string; de: 
   )
 }
 
-// ─── Fit Vocab Swipe with 3D flip ─────────────────────────────────────────────
+// ─── Fit Vocab Input ──────────────────────────────────────────────────────────
 
-function FitVocabSwipe({ vocab, onFinish }: { vocab: { es: string; de: string }[]; onFinish: () => void }) {
+function FitVocabInput({ vocab, onFinish }: { vocab: VocabItem[]; onFinish: () => void }) {
   const [index, setIndex] = useState(0)
-  const [revealed, setRevealed] = useState(false)
-  const [offset, setOffset] = useState(0)
-  const [animDir, setAnimDir] = useState<'left' | 'right' | null>(null)
-
-  const startXRef = useRef<number | null>(null)
-  const dragXRef = useRef(0)
-  const hasDraggedRef = useRef(false)
+  const [input, setInput] = useState('')
+  const [result, setResult] = useState<'correct' | 'close' | 'wrong' | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const done = index >= vocab.length
 
-  // direction: 'left' = next card, 'right' = previous card
-  function advance(dir: 'left' | 'right') {
-    if (dir === 'right' && index === 0) return // can't go before first card
-    setAnimDir(dir)
-    setTimeout(() => {
-      setIndex(i => dir === 'left' ? i + 1 : i - 1)
-      setRevealed(false)
-      setOffset(0)
-      setAnimDir(null)
-    }, 250)
+  function advance() {
+    setIndex(i => i + 1)
+    setInput('')
+    setResult(null)
+    setTimeout(() => inputRef.current?.focus(), 50)
   }
 
-  function handleTouchStart(e: React.TouchEvent) {
-    startXRef.current = e.touches[0].clientX
-    dragXRef.current = 0
-    hasDraggedRef.current = false
-  }
-
-  function handleTouchMove(e: React.TouchEvent) {
-    if (startXRef.current === null || animDir !== null) return
-    const dx = e.touches[0].clientX - startXRef.current
-    dragXRef.current = dx
-    if (Math.abs(dx) > 8) hasDraggedRef.current = true
-    // Clamp visual feedback to 80px
-    setOffset(Math.max(-80, Math.min(80, dx)))
-  }
-
-  function handleTouchEnd() {
-    if (animDir !== null) return
-    if (hasDraggedRef.current && Math.abs(dragXRef.current) > 50) {
-      // swipe left (dx < 0) = next, swipe right (dx > 0) = previous
-      advance(dragXRef.current < 0 ? 'left' : 'right')
-    } else {
-      setOffset(0)
-    }
-    startXRef.current = null
-  }
-
-  function handleTap() {
-    if (hasDraggedRef.current) { hasDraggedRef.current = false; return }
-    if (!revealed) {
-      setRevealed(true)
-      navigator.vibrate?.(8)
-    }
+  function handleSubmit() {
+    if (!input.trim() || result !== null) return
+    const item = vocab[index]
+    const trimmed = input.trim()
+    const targetBase = stripArticle(item.es)
+    const exact = isCloseMatch(trimmed, item.es) || isCloseMatch(trimmed, targetBase)
+    const close = !exact && (
+      isCloseMatch(trimmed, item.es.split(' ').pop() ?? item.es) ||
+      isCloseMatch(trimmed, targetBase.split(' ').pop() ?? targetBase)
+    )
+    const res = exact ? 'correct' : close ? 'close' : 'wrong'
+    setResult(res)
+    recordVocabAnswer(item.es, res === 'correct' || res === 'close')
+    navigator.vibrate?.(res === 'correct' ? 10 : 5)
   }
 
   if (done) {
     return (
       <div className="flex flex-col gap-3 fade-in">
-        <p className="text-xs text-muted text-center">Alle Vokabeln gesehen</p>
+        <p className="text-xs text-muted text-center">Alle Vokabeln geübt</p>
         <Button variant="primary" fullWidth onClick={() => { navigator.vibrate?.(10); onFinish() }}>
           Fertig
         </Button>
@@ -400,68 +613,10 @@ function FitVocabSwipe({ vocab, onFinish }: { vocab: { es: string; de: string }[
     )
   }
 
-  const card = vocab[index]
-
-  // Swipe translate for the outer (drag) layer
-  let swipeTransform: string
-  let swipeTransition: string
-  if (animDir !== null) {
-    swipeTransform = `translateX(${animDir === 'left' ? '-110%' : '110%'})`
-    swipeTransition = 'transform 250ms ease-out'
-  } else if (offset !== 0) {
-    swipeTransform = `translateX(${offset}px)`
-    swipeTransition = 'none'
-  } else {
-    swipeTransform = 'translateX(0)'
-    swipeTransition = 'transform 150ms ease-out'
-  }
+  const item = vocab[index]
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Clip the swipe slide */}
-      <div className="overflow-hidden rounded-[20px]">
-        {/* key triggers fade-in when card changes */}
-        <div
-          key={index}
-          className="cursor-pointer select-none fade-in"
-          style={{ transform: swipeTransform, transition: swipeTransition }}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          onClick={handleTap}
-        >
-          {/* Perspective wrapper for 3D flip */}
-          <div style={{ perspective: '1000px' }}>
-            <div
-              className="relative min-h-[200px]"
-              style={{
-                transformStyle: 'preserve-3d',
-                transform: revealed ? 'rotateY(180deg)' : 'rotateY(0deg)',
-                transition: 'transform 400ms ease-out',
-              }}
-            >
-              {/* Front face */}
-              <div
-                className="bg-white rounded-[20px] border border-[#E2D7C8]/50 px-6 py-10 min-h-[200px] flex flex-col items-center justify-center shadow-card"
-                style={{ backfaceVisibility: 'hidden' }}
-              >
-                <p className="text-2xl font-semibold text-text text-center">{card.es}</p>
-                <p className="text-xs text-muted mt-4">Tippe zum Aufdecken</p>
-              </div>
-              {/* Back face */}
-              <div
-                className="absolute inset-0 bg-white rounded-[20px] border border-[#E2D7C8]/50 px-6 py-10 flex flex-col items-center justify-center shadow-card"
-                style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
-              >
-                <p className="text-sm text-muted text-center mb-2">{card.es}</p>
-                <p className="text-2xl font-semibold text-text text-center">{card.de}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Dot indicators */}
       <div className="flex justify-center gap-1.5 items-center">
         {vocab.map((_, i) => (
           <span
@@ -473,18 +628,44 @@ function FitVocabSwipe({ vocab, onFinish }: { vocab: { es: string; de: string }[
         ))}
       </div>
 
-      {revealed && (
-        <Button
-          variant={index === vocab.length - 1 ? 'primary' : 'secondary'}
-          fullWidth
-          onClick={() => {
-            if (index === vocab.length - 1) { navigator.vibrate?.(10); onFinish() }
-            else advance('left')
-          }}
-        >
-          {index === vocab.length - 1 ? 'Fertig' : 'Weiter →'}
-        </Button>
-      )}
+      <Card className="fade-in" key={index}>
+        <p className="text-[13px] text-muted uppercase tracking-wide mb-2">Wie heißt das auf Spanisch?</p>
+        <p className="text-xl font-semibold text-text mb-4">{item.de}</p>
+
+        {result === null ? (
+          <>
+            <input
+              ref={inputRef}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleSubmit() }}
+              placeholder="Auf Spanisch tippen…"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              className="w-full bg-white border border-[#E0DDD8] rounded-btn px-4 py-3 text-base text-text placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent mb-3"
+            />
+            <Button variant="primary" fullWidth onClick={handleSubmit} disabled={!input.trim()}>
+              Prüfen
+            </Button>
+          </>
+        ) : (
+          <>
+            <div className={`rounded-btn px-4 py-3 text-sm font-medium mb-3 ${result === 'correct' || result === 'close' ? 'bg-[#FBF0EE] text-accent border border-accent/30' : 'bg-[#F5F1EB] text-muted border border-[#E0DDD8]'}`}>
+              {result === 'correct' && <span>Richtig: <span className="font-semibold">{item.es}</span></span>}
+              {result === 'close' && <span>Fast! Die Antwort: <span className="font-semibold">{item.es}</span></span>}
+              {result === 'wrong' && <span>Die Antwort: <span className="font-semibold text-text">{item.es}</span></span>}
+            </div>
+            <Button
+              variant={index === vocab.length - 1 ? 'primary' : 'secondary'}
+              fullWidth
+              onClick={index === vocab.length - 1 ? () => { navigator.vibrate?.(10); onFinish() } : advance}
+            >
+              {index === vocab.length - 1 ? 'Fertig' : 'Weiter →'}
+            </Button>
+          </>
+        )}
+      </Card>
     </div>
   )
 }
@@ -517,7 +698,7 @@ function FitView({ lesson, onFinish }: { lesson: Extract<Lesson, { mode: 'fit' }
             <span className="text-xs font-semibold text-accent uppercase tracking-wide">Schritt 2 von 2</span>
             <span className="text-xs text-muted">Vokabeln</span>
           </div>
-          <FitVocabSwipe vocab={lesson.vocab} onFinish={onFinish} />
+          <FitVocabInput vocab={lesson.vocab} onFinish={onFinish} />
         </>
       )}
     </div>
