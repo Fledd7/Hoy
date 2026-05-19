@@ -2,9 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import LessonView from '../components/LessonView'
 import Button from '../components/Button'
-import { getUser } from '../lib/storage'
-import { addSeenVocab } from '../lib/storage'
-import { fetchLektion } from '../lib/api'
+import { getUser, addSeenVocab, addCompletedModeToday, getCompletedModesToday } from '../lib/storage'
+import { fetchLektion, clearModeCache } from '../lib/api'
 import type { EnergyMode, Lesson } from '../lib/types'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -94,6 +93,10 @@ export default function Lektion() {
 
   useEffect(() => {
     if (!mode || mode === 'erzaehl') return
+    // If this mode was already completed today, bypass the cache for a fresh lesson
+    if (getCompletedModesToday().has(mode)) {
+      clearModeCache(mode)
+    }
     void loadLektion(mode)
   }, [mode, loadLektion])
 
@@ -109,8 +112,9 @@ export default function Lektion() {
     if (pageState.kind === 'ready') {
       addSeenVocab(extractVocab(pageState.lesson))
     }
+    if (mode) addCompletedModeToday(mode)
     setAbschluss(true)
-  }, [pageState])
+  }, [pageState, mode])
 
   // ─── invalid mode ──────────────────────────────────────────────────────────
   if (!mode) {

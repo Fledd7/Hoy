@@ -1,29 +1,29 @@
 import { useNavigate } from 'react-router-dom'
+import { User } from 'lucide-react'
+import { getUser } from '../lib/storage'
 
 export default function ProfileIcon() {
   const navigate = useNavigate()
+  const user = getUser()
+  const initial = user?.why?.trim().charAt(0).toUpperCase() || null
+
+  function handleClick() {
+    navigator.vibrate?.(8)
+    navigate('/profil')
+  }
 
   return (
     <button
-      onClick={() => navigate('/profil')}
+      onClick={handleClick}
       aria-label="Profil öffnen"
-      className="w-10 h-10 rounded-full bg-[#EDE9E3] flex items-center justify-center tap-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      className="w-11 h-11 rounded-full bg-white flex items-center justify-center tap-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      style={{ border: '1px solid #E0DBD6' }}
     >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="20"
-        height="20"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="#6B6B6B"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
-        <circle cx="12" cy="8" r="4" />
-        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-      </svg>
+      {initial ? (
+        <span className="font-serif text-[18px] font-semibold text-accent leading-none select-none">{initial}</span>
+      ) : (
+        <User size={20} color="#6B6B6B" aria-hidden="true" />
+      )}
     </button>
   )
 }

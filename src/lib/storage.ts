@@ -1,9 +1,10 @@
-import type { UserData, LessonHistoryItem } from './types';
+import type { UserData, LessonHistoryItem, EnergyMode } from './types';
 
 const USER_KEY = 'hoy_user';
 const LESSON_CACHE_KEY = 'hoy_lessonCache';
 const SEEN_VOCAB_KEY = 'hoy_seenVocab';
 const COMPLETED_LESSONS_KEY = 'hoy_completedLessons';
+const COMPLETED_MODES_KEY = 'hoy_completedModes';
 const LESSON_HISTORY_KEY = 'hoy_lessonHistory';
 const MAX_SEEN_VOCAB = 100;
 const MAX_HISTORY = 30;
@@ -40,6 +41,7 @@ export function resetAll(): void {
   localStorage.removeItem(LESSON_CACHE_KEY);
   localStorage.removeItem(SEEN_VOCAB_KEY);
   localStorage.removeItem(COMPLETED_LESSONS_KEY);
+  localStorage.removeItem(COMPLETED_MODES_KEY);
   localStorage.removeItem(LESSON_HISTORY_KEY);
 }
 
@@ -120,6 +122,35 @@ export function addCompletedLesson(): void {
 
 export function hasCompletedToday(): boolean {
   return getCompletedLessons().includes(todayStr());
+}
+
+// ─── Completed Modes (per-mode daily tracking) ────────────────────────────────
+
+type CompletedModesData = Record<string, EnergyMode[]>
+
+export function getCompletedModesToday(): Set<EnergyMode> {
+  try {
+    const raw = localStorage.getItem(COMPLETED_MODES_KEY);
+    if (!raw) return new Set();
+    const data = JSON.parse(raw) as CompletedModesData;
+    return new Set(data[todayStr()] ?? []);
+  } catch {
+    return new Set();
+  }
+}
+
+export function addCompletedModeToday(mode: EnergyMode): void {
+  try {
+    const raw = localStorage.getItem(COMPLETED_MODES_KEY);
+    const data: CompletedModesData = raw ? (JSON.parse(raw) as CompletedModesData) : {};
+    const today = todayStr();
+    const existing = data[today] ?? [];
+    if (existing.includes(mode)) return;
+    data[today] = [...existing, mode];
+    localStorage.setItem(COMPLETED_MODES_KEY, JSON.stringify(data));
+  } catch {
+    // storage unavailable
+  }
 }
 
 // ─── Lesson History ───────────────────────────────────────────────────────────

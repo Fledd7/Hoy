@@ -132,6 +132,21 @@ export function hasTodayCache(modus: CacheableMode): boolean {
   return getCached(modus) !== null
 }
 
+export function clearModeCache(modus: CacheableMode): void {
+  try {
+    const raw = localStorage.getItem(LESSON_CACHE_KEY)
+    if (!raw) return
+    const cache = JSON.parse(raw) as LessonCache
+    const today = todayKey()
+    if (cache[today]) {
+      delete cache[today][modus]
+      localStorage.setItem(LESSON_CACHE_KEY, JSON.stringify(cache))
+    }
+  } catch {
+    // storage unavailable
+  }
+}
+
 export interface LessonProfil {
   niveau: string
   themen: string[]

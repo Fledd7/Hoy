@@ -55,16 +55,17 @@ export default function Onboarding() {
 
   if (step === 'welcome') {
     return (
-      <OnboardingStep
-        title="Hola. Ich bin Hoy."
-        subtitle="Spanisch lernen – ein kleiner Moment am Tag. Kein Druck, kein Stress."
-      >
-        <div className="mt-auto">
-          <Button variant="primary" fullWidth onClick={() => setStep('niveau')}>
-            Los geht's
-          </Button>
+      <div className="fade-in flex flex-col min-h-screen bg-background">
+        <div className="mx-auto w-full max-w-content px-8 flex-1 flex flex-col justify-center pb-[10vh]">
+          <h1 className="font-serif text-[36px] font-semibold text-text leading-tight">Hola. Ich bin Hoy.</h1>
+          <p className="text-[18px] text-[#6B6B6B] mt-3 leading-snug">Spanisch lernen – ein kleiner Moment am Tag. Kein Druck, kein Stress.</p>
+          <div className="mt-16">
+            <Button variant="primary" fullWidth onClick={() => setStep('niveau')}>
+              Los geht's
+            </Button>
+          </div>
         </div>
-      </OnboardingStep>
+      </div>
     )
   }
 

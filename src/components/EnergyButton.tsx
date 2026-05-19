@@ -6,6 +6,7 @@ interface EnergyButtonProps {
   sublabel: string
   onClick: () => void
   icon: ReactNode
+  doneToday?: boolean
   recommended?: boolean
   recommendedNote?: string
 }
@@ -15,6 +16,7 @@ export default function EnergyButton({
   sublabel,
   onClick,
   icon,
+  doneToday = false,
   recommended = false,
   recommendedNote,
 }: EnergyButtonProps) {
@@ -40,6 +42,12 @@ export default function EnergyButton({
           <span className="block font-serif text-[22px] font-semibold text-text leading-tight">{label}</span>
           <span className="block text-[13px] text-muted mt-0.5">{sublabel}</span>
         </span>
+        {doneToday && (
+          <span className="flex items-center gap-1 flex-shrink-0 mr-1">
+            <span className="w-2 h-2 rounded-full bg-[#7CA982] flex-shrink-0" />
+            <span className="text-[11px] text-muted whitespace-nowrap">Heute gemacht</span>
+          </span>
+        )}
         <ChevronRight size={18} className="text-muted flex-shrink-0" />
       </button>
       {recommended && recommendedNote && (
