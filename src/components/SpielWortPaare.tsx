@@ -40,7 +40,7 @@ export default function SpielWortPaare({ vocab, onNochmal, onZurueck }: Props) {
   const [done, setDone] = useState(false)
   const autoRedirectRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const totalPairs = 6
+  const totalPairs = new Set(cards.map(c => c.pairKey)).size
 
   useEffect(() => {
     return () => {
@@ -61,8 +61,10 @@ export default function SpielWortPaare({ vocab, onNochmal, onZurueck }: Props) {
       return
     }
 
-    // Two cards revealed – check for match
+    // Show both cards before evaluating the pair
+    setRevealed(newRevealed)
     setLocked(true)
+
     const [firstId, secondId] = newRevealed
     const first = cards.find(c => c.id === firstId)!
     const second = cards.find(c => c.id === secondId)!
@@ -91,12 +93,7 @@ export default function SpielWortPaare({ vocab, onNochmal, onZurueck }: Props) {
         }
       }, 400)
     } else {
-      // Wrong pair – flip back after 1s
-      setCards(prev =>
-        prev.map(c =>
-          c.id === firstId || c.id === secondId ? { ...c, state: 'hidden' } : c,
-        ),
-      )
+      // Wrong pair – both cards visible for 1s, then flip back
       setTimeout(() => {
         setRevealed([])
         setLocked(false)
