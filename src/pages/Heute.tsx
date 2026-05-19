@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, Zap, Flame, MessageCircle } from 'lucide-react'
+import { BookOpen, Zap, Flame, MessageCircle, RotateCcw, ChevronRight } from 'lucide-react'
 import ProfileIcon from '../components/ProfileIcon'
 import EnergyButton from '../components/EnergyButton'
 import ReturnBanner from '../components/ReturnBanner'
@@ -13,6 +13,7 @@ import {
   getUser,
 } from '../lib/storage'
 import { ETAPPEN } from '../lib/etappen'
+import { getReviewableCount } from '../lib/vocabTracking'
 import type { EnergyMode, UserData } from '../lib/types'
 
 const ENERGIE_BUTTONS: { mode: EnergyMode; label: string; sublabel: string; icon: ReactNode }[] = [
@@ -54,12 +55,38 @@ function pickGreeting(): { es: string; de: string } {
   return RANDOM_GREETINGS[Math.floor(Math.random() * RANDOM_GREETINGS.length)]
 }
 
+function WiederholenButton({ available, onClick }: { available: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={available ? () => { navigator.vibrate?.(10); onClick() } : undefined}
+      disabled={!available}
+      className="w-full h-[72px] rounded-[18px] px-5 text-left flex items-center gap-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+      style={{
+        border: '1px dashed #E0DBD6',
+        background: 'rgba(255,255,255,0.4)',
+        opacity: available ? 1 : 0.5,
+        cursor: available ? 'pointer' : 'not-allowed',
+      }}
+    >
+      <RotateCcw size={24} className="text-accent flex-shrink-0" style={{ opacity: available ? 1 : 0.6 }} />
+      <span className="flex-1 min-w-0">
+        <span className="block font-serif text-[20px] font-semibold text-text leading-tight">Wiederholen</span>
+        <span className="block text-[13px] text-muted mt-0.5">
+          {available ? 'Was du schon kennst, vertiefen' : 'Wird verfügbar, sobald du Vokabeln gelernt hast'}
+        </span>
+      </span>
+      {available && <ChevronRight size={18} className="text-muted flex-shrink-0" />}
+    </button>
+  )
+}
+
 export default function Heute() {
   const navigate = useNavigate()
   const [showBanner, setShowBanner] = useState(false)
   const [greeting] = useState(pickGreeting)
   const [doneToday, setDoneToday] = useState<Set<EnergyMode>>(new Set())
   const [user, setUser] = useState<UserData | null>(null)
+  const [reviewableCount, setReviewableCount] = useState(0)
 
   useEffect(() => {
     if (!isOnboardingDone()) {
@@ -72,6 +99,7 @@ export default function Heute() {
     updateLetztesOeffnen()
     setDoneToday(getCompletedModesToday())
     setUser(getUser())
+    setReviewableCount(getReviewableCount())
   }, [navigate])
 
   function handleEnergySelect(mode: EnergyMode) {
@@ -149,6 +177,17 @@ export default function Heute() {
               />
             </div>
           ))}
+        </div>
+
+        {/* ─── Wiederholen ────────────────────────────────────────────── */}
+        <div className="enter-up mt-4" style={{ animationDelay: '360ms' }}>
+          <div className="flex justify-center mb-3">
+            <div style={{ width: '50%', height: 1, background: '#E5E2DD' }} />
+          </div>
+          <WiederholenButton
+            available={reviewableCount >= 5}
+            onClick={() => navigate('/wiederholen')}
+          />
         </div>
 
       </div>
