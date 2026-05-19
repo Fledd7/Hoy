@@ -14,6 +14,7 @@ import { fetchLektion, clearModeCache } from '../lib/api'
 import { ETAPPEN } from '../lib/etappen'
 import type { Etappe } from '../lib/etappen'
 import type { EnergyMode, Lesson } from '../lib/types'
+import { recordVocabSeen, getAllTrackedVocab } from '../lib/vocabTracking'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -34,14 +35,9 @@ function extractVocab(lesson: Lesson): { es: string; de: string }[] {
 }
 
 function extractKeyword(lesson: Lesson): { es: string; de: string } | null {
-  if (lesson.mode === 'muede') return lesson.vocab[0] ?? null
-  if (lesson.mode === 'fit')   return lesson.vocab[0] ?? null
-  if (lesson.mode === 'erzaehl') return lesson.vocab[0] ?? null
-  const stop = new Set(['el','la','los','las','un','una','en','de','a','y','que',
-    'se','su','con','por','para','es','ha','al','del','su','lo'])
-  const words = lesson.text.split(/[\s,.:;!?'"()]+/)
-  const word = words.find(w => w.length > 4 && !stop.has(w.toLowerCase()))
-  return word ? { es: word, de: '' } : null
+  if (lesson.schluesselwort) return lesson.schluesselwort
+  if (lesson.mode !== 'okay') return lesson.vocab[0] ?? null
+  return null
 }
 
 // ─── Etappen-Übergangs-Screen ─────────────────────────────────────────────────
@@ -75,7 +71,6 @@ function EtappenUebergangScreen({
       </p>
 
       <div className="w-full max-w-[340px] flex flex-col gap-4">
-        {/* Alte Etappe – fades up */}
         <div
           style={{
             opacity: phase >= 1 ? 0 : 1,
@@ -94,7 +89,6 @@ function EtappenUebergangScreen({
           </div>
         </div>
 
-        {/* Neue Etappe – fades in */}
         <div
           style={{
             opacity: phase >= 1 ? 1 : 0,
@@ -153,6 +147,7 @@ export default function Lektion() {
   const [searchParams] = useSearchParams()
   const [abschluss, setAbschluss] = useState(false)
   const [fadingOut, setFadingOut] = useState(false)
+  const [nochEine, setNochEine] = useState(false)
   const [erzaehlInput, setErzaehlInput] = useState('')
   const [etappenUebergang, setEtappenUebergang] = useState<{ von: Etappe; zu: Etappe } | null>(null)
 
@@ -210,13 +205,13 @@ export default function Lektion() {
     void loadLektion(mode)
   }, [mode, loadLektion])
 
-  // Abschluss timing: 1800ms total, fade-out starts at 1600ms
+  // Abschluss: keyword screen for 1600ms, then fade and show nochEine
   useEffect(() => {
     if (!abschluss) return
     const t1 = setTimeout(() => setFadingOut(true), 1600)
-    const t2 = setTimeout(() => navigate('/heute', { replace: true }), 1800)
+    const t2 = setTimeout(() => { setFadingOut(false); setNochEine(true) }, 1800)
     return () => { clearTimeout(t1); clearTimeout(t2) }
-  }, [abschluss, navigate])
+  }, [abschluss])
 
   const handleWeiter = useCallback(() => {
     navigate('/heute', { replace: true })
@@ -224,7 +219,9 @@ export default function Lektion() {
 
   const handleFinish = useCallback(() => {
     if (pageState.kind === 'ready') {
-      addSeenVocab(extractVocab(pageState.lesson))
+      const vocab = extractVocab(pageState.lesson)
+      addSeenVocab(vocab)
+      vocab.forEach(v => recordVocabSeen(v.es, v.de))
     }
     if (mode) addCompletedModeToday(mode)
 
@@ -255,6 +252,29 @@ export default function Lektion() {
       <div className="flex flex-col min-h-screen bg-background items-center justify-center px-6 gap-4">
         <p className="text-muted text-center">Lektion nicht gefunden.</p>
         <Button variant="ghost" onClick={() => navigate('/heute')}>Zurück</Button>
+      </div>
+    )
+  }
+
+  // ─── noch eine? ───────────────────────────────────────────────────────────
+  if (nochEine) {
+    const hasVocabForReview = Object.keys(getAllTrackedVocab()).length >= 5
+    return (
+      <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#FAF7F2] to-[#F5F1EB] items-center justify-center px-8 gap-5 fade-in">
+        <p className="font-serif text-[24px] font-semibold text-text text-center">Noch eine?</p>
+        <div className="flex flex-col gap-3 w-full max-w-[340px]">
+          <Button variant="primary" fullWidth onClick={() => navigate('/heute', { replace: true })}>
+            Noch eine Lektion
+          </Button>
+          {hasVocabForReview && (
+            <Button variant="secondary" fullWidth onClick={() => navigate('/wiederholen', { replace: true })}>
+              Wiederholen
+            </Button>
+          )}
+          <Button variant="ghost" fullWidth onClick={() => navigate('/heute', { replace: true })}>
+            Für heute reicht's
+          </Button>
+        </div>
       </div>
     )
   }

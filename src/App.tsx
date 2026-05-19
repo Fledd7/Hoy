@@ -4,6 +4,7 @@ import Onboarding from './pages/Onboarding'
 import Heute from './pages/Heute'
 import Lektion from './pages/Lektion'
 import Profil from './pages/Profil'
+import Wiederholen from './pages/Wiederholen'
 
 export default function App() {
   return (
@@ -14,6 +15,7 @@ export default function App() {
         <Route path="/heute" element={<Heute />} />
         <Route path="/lektion" element={<Lektion />} />
         <Route path="/profil" element={<Profil />} />
+        <Route path="/wiederholen" element={<Wiederholen />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>

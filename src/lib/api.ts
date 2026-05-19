@@ -95,35 +95,47 @@ interface ErzaehlResponse {
   vokabeln: VocabItem[]
 }
 
+interface WithSchluesselwort {
+  schluesselwort?: { es: string; de: string }
+}
+
+function extractSchluesselwort(d: WithSchluesselwort): { es: string; de: string } | undefined {
+  const s = d.schluesselwort
+  if (s && typeof s.es === 'string' && typeof s.de === 'string') return { es: s.es, de: s.de }
+  return undefined
+}
+
 function mapToLesson(modus: EnergyMode, raw: unknown): Lesson {
   if (modus === 'muede') {
-    const d = raw as MuedeResponse
+    const d = raw as MuedeResponse & WithSchluesselwort
     if (!d.text_es || !d.text_de || !Array.isArray(d.vokabeln)) throw new Error('invalid muede')
-    return { mode: 'muede', text: d.text_es, translation: d.text_de, vocab: d.vokabeln }
+    return { mode: 'muede', text: d.text_es, translation: d.text_de, vocab: d.vokabeln, schluesselwort: extractSchluesselwort(d) }
   }
   if (modus === 'okay') {
-    const d = raw as OkayResponse
+    const d = raw as OkayResponse & WithSchluesselwort
     if (!d.text_es || !d.text_de || !Array.isArray(d.fragen)) throw new Error('invalid okay')
     return {
       mode: 'okay',
       text: d.text_es,
       translation: d.text_de,
       questions: d.fragen.map(f => ({ question: f.frage, options: f.antworten, correctIndex: f.richtig })),
+      schluesselwort: extractSchluesselwort(d),
     }
   }
   if (modus === 'fit') {
-    const d = raw as FitResponse
+    const d = raw as FitResponse & WithSchluesselwort
     if (!Array.isArray(d.dialog) || !Array.isArray(d.vokabeln)) throw new Error('invalid fit')
     return {
       mode: 'fit',
       dialog: d.dialog.map(l => ({ speaker: l.sprecher, es: l.es, de: l.de })),
       vocab: d.vokabeln,
+      schluesselwort: extractSchluesselwort(d),
     }
   }
   // erzaehl
-  const d = raw as ErzaehlResponse
+  const d = raw as ErzaehlResponse & WithSchluesselwort
   if (!Array.isArray(d.saetze) || !Array.isArray(d.vokabeln)) throw new Error('invalid erzaehl')
-  return { mode: 'erzaehl', saetze: d.saetze, vocab: d.vokabeln }
+  return { mode: 'erzaehl', saetze: d.saetze, vocab: d.vokabeln, schluesselwort: extractSchluesselwort(d) }
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────

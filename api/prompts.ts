@@ -16,10 +16,10 @@ const NIVEAU_MAP: Record<string, string> = {
 }
 
 const SCHEMAS: Record<string, string> = {
-  muede: '{"text_es":"string","text_de":"string","vokabeln":[{"es":"string","de":"string"}]}',
-  okay: '{"text_es":"string","text_de":"string","fragen":[{"frage":"string","antworten":["string","string","string"],"richtig":0}]}',
-  fit: '{"dialog":[{"sprecher":"string","es":"string","de":"string"}],"vokabeln":[{"es":"string","de":"string"}]}',
-  erzaehl: '{"saetze":[{"es":"string","de":"string"}],"vokabeln":[{"es":"string","de":"string"}]}',
+  muede: '{"text_es":"string","text_de":"string","vokabeln":[{"es":"string","de":"string"}],"schluesselwort":{"es":"string","de":"string"}}',
+  okay: '{"text_es":"string","text_de":"string","fragen":[{"frage":"string","antworten":["string","string","string"],"richtig":0}],"schluesselwort":{"es":"string","de":"string"}}',
+  fit: '{"dialog":[{"sprecher":"string","es":"string","de":"string"}],"vokabeln":[{"es":"string","de":"string"}],"schluesselwort":{"es":"string","de":"string"}}',
+  erzaehl: '{"saetze":[{"es":"string","de":"string"}],"vokabeln":[{"es":"string","de":"string"}],"schluesselwort":{"es":"string","de":"string"}}',
 }
 
 export function buildPrompt(modus: string, ctx: PromptContext): string {
@@ -45,29 +45,37 @@ export function buildPrompt(modus: string, ctx: PromptContext): string {
       `Lernkontext: ${whyStr}. ` +
       `Antworte AUSSCHLIESSLICH mit validem JSON ohne Markdown-Blöcke.`
 
+  const schluesselwortHinweis =
+    `Wähle außerdem das wichtigste Schlüsselwort der Lektion als "schluesselwort" ` +
+    `(das Wort, das den Kern der Lektion am besten zusammenfasst – auf Spanisch mit deutscher Übersetzung). `
+
   const modusPrompts: Record<string, string> = {
     muede:
       `Erstelle eine sehr kurze Mini-Lektion (2 Sätze, max 30 Wörter) ` +
       `über ein Thema aus ${themenStr}. ` +
       `Markiere danach 2-3 wichtige Vokabeln aus dem Text. ` +
+      schluesselwortHinweis +
       `JSON-Schema: ${schema}`,
     okay:
       `Erstelle eine kurze Lektion (4-5 Sätze, max 70 Wörter) ` +
       `über ein Thema aus ${themenStr}. ` +
       `Erstelle genau 3 Multiple-Choice-Verständnisfragen auf Deutsch zum spanischen Text, ` +
       `mit jeweils 3 Antwortoptionen und korrektem Index (0-basiert). ` +
+      schluesselwortHinweis +
       `JSON-Schema: ${schema}`,
     fit:
       `Erstelle einen kurzen alltagsnahen Dialog (5-6 Zeilen) zwischen zwei Personen ` +
       `über ein Thema aus ${themenStr}. ` +
       `Verwende natürliche spanische Sprechernamen. ` +
       `Ergänze 5 wichtige Vokabeln aus dem Dialog. ` +
+      schluesselwortHinweis +
       `JSON-Schema: ${schema}`,
     erzaehl:
       `Der Nutzer hat eingegeben: "${ctx.userInput ?? ''}". ` +
       `Erstelle daraus 3 einfache spanische Sätze, die diese Aktivitäten beschreiben, ` +
       `mit deutscher Übersetzung je Satz. ` +
       `Ergänze 5 nützliche Vokabeln aus den Sätzen. ` +
+      schluesselwortHinweis +
       `JSON-Schema: ${schema}`,
   }
 
