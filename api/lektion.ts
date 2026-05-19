@@ -31,7 +31,7 @@ function extractJson(raw: string): string {
   return fenced ? fenced[1].trim() : raw.trim()
 }
 
-async function callGemini(prompt: string, apiKey: string): Promise<unknown> {
+async function callGemini(prompt: string, apiKey: string, modus: string): Promise<unknown> {
   const url =
     `https://generativelanguage.googleapis.com/v1beta/models/` +
     `gemini-2.5-flash:generateContent?key=${apiKey}`
@@ -58,6 +58,8 @@ async function callGemini(prompt: string, apiKey: string): Promise<unknown> {
   }
 
   if (!res.ok) {
+    const snippet = await res.text().catch(() => '').then(t => t.slice(0, 300))
+    console.error(`[hoy/api] stage=gemini_http modus=${modus} status=${res.status} snippet=${snippet}`)
     throw new Error(`gemini_${res.status}`)
   }
 
@@ -65,12 +67,14 @@ async function callGemini(prompt: string, apiKey: string): Promise<unknown> {
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text
 
   if (!text) {
+    console.error(`[hoy/api] stage=gemini_empty modus=${modus} candidates=${data.candidates?.length ?? 0}`)
     throw new Error('gemini_empty_response')
   }
 
   try {
     return JSON.parse(extractJson(text)) as unknown
   } catch {
+    console.error(`[hoy/api] stage=json_parse_failed modus=${modus} snippet=${text.slice(0, 300)}`)
     throw new Error('gemini_json_parse')
   }
 }
@@ -82,7 +86,8 @@ export default async function handler(request: Request): Promise<Response> {
 
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'fallback' }), { status: 500 })
+    console.error('[hoy/api] stage=missing_key has_api_key=false')
+    return new Response(JSON.stringify({ error: 'fallback', reason: 'missing_api_key' }), { status: 500 })
   }
 
   let body: RequestBody
@@ -93,21 +98,24 @@ export default async function handler(request: Request): Promise<Response> {
   }
 
   const { modus, profil, userInput } = body
+  console.error(`[hoy/api] stage=start modus=${modus} has_api_key=true`)
   const prompt = buildPrompt(modus, { ...profil, userInput })
 
   let lastErr: unknown
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const result = await callGemini(prompt, apiKey)
+      const result = await callGemini(prompt, apiKey, modus)
       return new Response(JSON.stringify(result), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
     } catch (err) {
       lastErr = err
+      console.error(`[hoy/api] stage=attempt_failed modus=${modus} attempt=${attempt + 1} error=${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
-  void lastErr
-  return new Response(JSON.stringify({ error: 'fallback' }), { status: 500 })
+  const reason = lastErr instanceof Error ? lastErr.message : 'unknown'
+  return new Response(JSON.stringify({ error: 'fallback', reason }), { status: 500 })
 }
+
