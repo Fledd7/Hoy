@@ -3,7 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import LessonView from '../components/LessonView'
 import Button from '../components/Button'
 import { getUser, addSeenVocab, addCompletedModeToday, getCompletedModesToday } from '../lib/storage'
-import { fetchLektion, clearModeCache } from '../lib/api'
+import { fetchLektion, clearModeCache, FallbackError } from '../lib/api'
+import type { FallbackDetails } from '../lib/api'
 import type { EnergyMode, Lesson } from '../lib/types'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -40,13 +41,58 @@ type PageState =
   | { kind: 'erzaehl_input' }
   | { kind: 'loading' }
   | { kind: 'ready'; lesson: Lesson }
-  | { kind: 'error' }
+  | { kind: 'error'; debugDetails?: FallbackDetails }
 
 const BACK_BTN =
   'text-muted text-sm tap-scale self-start mb-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded'
 
 const PAGE_WRAP =
   'flex flex-col min-h-screen bg-gradient-to-b from-[#FAF7F2] to-[#F5F1EB] max-w-content mx-auto px-5 pt-5 pb-10'
+
+// ─── Debug-only error screen (entfernt in v0.8) ───────────────────────────────
+
+function ErrorScreen({
+  backBtn,
+  debugDetails,
+  onRetry,
+}: {
+  backBtn: React.ReactNode
+  debugDetails: FallbackDetails | undefined
+  onRetry: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className={PAGE_WRAP}>
+      {backBtn}
+      <div className="flex flex-col items-center text-center gap-4 pt-8">
+        <p className="text-muted text-base">
+          Die Lektion konnte nicht geladen werden. Versuch es später nochmal.
+        </p>
+        <Button
+          variant="secondary"
+          onClick={onRetry}
+        >
+          Nochmal versuchen
+        </Button>
+        {debugDetails && (
+          <div className="w-full text-left mt-2">
+            <button
+              onClick={() => setOpen(o => !o)}
+              className="text-[12px] text-muted underline underline-offset-2 focus-visible:outline-none"
+            >
+              {open ? 'Details verbergen' : 'Details anzeigen'}
+            </button>
+            {open && (
+              <pre className="mt-2 p-3 bg-[#F0EDE8] border border-[#E0DDD8] rounded-[8px] text-[12px] font-mono text-[#4A4A4A] whitespace-pre-wrap break-all leading-relaxed">
+                {JSON.stringify(debugDetails, null, 2)}
+              </pre>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -84,8 +130,9 @@ export default function Lektion() {
           userInput,
         )
         setPageState({ kind: 'ready', lesson })
-      } catch {
-        setPageState({ kind: 'error' })
+      } catch (err) {
+        const debugDetails = err instanceof FallbackError ? err.details : undefined
+        setPageState({ kind: 'error', debugDetails })
       }
     },
     [navigate],
@@ -204,24 +251,11 @@ export default function Lektion() {
 
   // ─── error ────────────────────────────────────────────────────────────────
   if (pageState.kind === 'error') {
-    return (
-      <div className={PAGE_WRAP}>
-        {backBtn}
-        <div className="flex flex-col items-center text-center gap-4 pt-8">
-          <p className="text-muted text-base">
-            Die Lektion konnte nicht geladen werden. Versuch es später nochmal.
-          </p>
-          <Button
-            variant="secondary"
-            onClick={() =>
-              void loadLektion(mode, mode === 'erzaehl' ? erzaehlInput.trim() : undefined)
-            }
-          >
-            Nochmal versuchen
-          </Button>
-        </div>
-      </div>
-    )
+    return <ErrorScreen
+      backBtn={backBtn}
+      debugDetails={pageState.debugDetails}
+      onRetry={() => void loadLektion(mode, mode === 'erzaehl' ? erzaehlInput.trim() : undefined)}
+    />
   }
 
   // ─── lesson ready ─────────────────────────────────────────────────────────

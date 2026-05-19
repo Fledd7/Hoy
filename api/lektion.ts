@@ -17,30 +17,117 @@ interface GeminiResponse {
   }>
 }
 
-async function callGemini(prompt: string, apiKey: string): Promise<unknown> {
+interface ErrorDetails {
+  hasApiKey: boolean
+  apiKeyLength: number
+  stage: 'fetch' | 'parse' | 'validate'
+  message: string
+  geminiStatus?: number
+  geminiResponse?: string
+}
+
+async function callGemini(
+  prompt: string,
+  apiKey: string,
+): Promise<{ result: unknown; details?: never } | { result?: never; details: ErrorDetails }> {
   const url =
     `https://generativelanguage.googleapis.com/v1beta/models/` +
     `gemini-2.5-flash:generateContent?key=${apiKey}`
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: 'application/json',
-        temperature: 0.7,
+  const baseDetails: Pick<ErrorDetails, 'hasApiKey' | 'apiKeyLength'> = {
+    hasApiKey: true,
+    apiKeyLength: apiKey.length,
+  }
+
+  // Stage: fetch
+  let res: Response
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.7,
+        },
+      }),
+    })
+  } catch (err) {
+    return {
+      details: {
+        ...baseDetails,
+        stage: 'fetch',
+        message: err instanceof Error ? err.message : String(err),
       },
-    }),
-  })
+    }
+  }
 
-  if (!res.ok) throw new Error(`gemini_${res.status}`)
+  if (!res.ok) {
+    let snippet = ''
+    try {
+      const text = await res.text()
+      snippet = text.slice(0, 200)
+    } catch { /* ignore */ }
+    return {
+      details: {
+        ...baseDetails,
+        stage: 'fetch',
+        message: `gemini_${res.status}`,
+        geminiStatus: res.status,
+        geminiResponse: snippet,
+      },
+    }
+  }
 
-  const data = (await res.json()) as GeminiResponse
+  // Stage: parse
+  let data: GeminiResponse
+  let rawText = ''
+  try {
+    rawText = await res.text()
+    data = JSON.parse(rawText) as GeminiResponse
+  } catch (err) {
+    return {
+      details: {
+        ...baseDetails,
+        stage: 'parse',
+        message: err instanceof Error ? err.message : String(err),
+        geminiStatus: res.status,
+        geminiResponse: rawText.slice(0, 200),
+      },
+    }
+  }
+
+  // Stage: validate
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text
-  if (!text) throw new Error('empty_response')
+  if (!text) {
+    return {
+      details: {
+        ...baseDetails,
+        stage: 'validate',
+        message: 'empty_response',
+        geminiStatus: res.status,
+        geminiResponse: rawText.slice(0, 200),
+      },
+    }
+  }
 
-  return JSON.parse(text) as unknown
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text) as unknown
+  } catch (err) {
+    return {
+      details: {
+        ...baseDetails,
+        stage: 'parse',
+        message: err instanceof Error ? err.message : String(err),
+        geminiStatus: res.status,
+        geminiResponse: text.slice(0, 200),
+      },
+    }
+  }
+
+  return { result: parsed }
 }
 
 export default async function handler(request: Request): Promise<Response> {
@@ -50,7 +137,18 @@ export default async function handler(request: Request): Promise<Response> {
 
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'fallback' }), { status: 500 })
+    return new Response(
+      JSON.stringify({
+        error: 'fallback',
+        details: {
+          hasApiKey: false,
+          apiKeyLength: 0,
+          stage: 'fetch',
+          message: 'GEMINI_API_KEY not set',
+        } satisfies ErrorDetails,
+      }),
+      { status: 500 },
+    )
   }
 
   let body: RequestBody
@@ -63,19 +161,20 @@ export default async function handler(request: Request): Promise<Response> {
   const { modus, profil, userInput } = body
   const prompt = buildPrompt(modus, { ...profil, userInput })
 
-  let lastErr: unknown
+  let lastDetails: ErrorDetails | undefined
   for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const result = await callGemini(prompt, apiKey)
-      return new Response(JSON.stringify(result), {
+    const outcome = await callGemini(prompt, apiKey)
+    if ('result' in outcome && outcome.result !== undefined) {
+      return new Response(JSON.stringify(outcome.result), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
-    } catch (err) {
-      lastErr = err
     }
+    lastDetails = outcome.details
   }
 
-  void lastErr
-  return new Response(JSON.stringify({ error: 'fallback' }), { status: 500 })
+  return new Response(
+    JSON.stringify({ error: 'fallback', details: lastDetails }),
+    { status: 500 },
+  )
 }

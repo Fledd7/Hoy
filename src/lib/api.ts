@@ -128,6 +128,23 @@ function mapToLesson(modus: EnergyMode, raw: unknown): Lesson {
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
+export interface FallbackDetails {
+  hasApiKey: boolean
+  apiKeyLength: number
+  stage: 'fetch' | 'parse' | 'validate'
+  message: string
+  geminiStatus?: number
+  geminiResponse?: string
+}
+
+export class FallbackError extends Error {
+  details?: FallbackDetails
+  constructor(details?: FallbackDetails) {
+    super('fallback')
+    this.details = details
+  }
+}
+
 export function hasTodayCache(modus: CacheableMode): boolean {
   return getCached(modus) !== null
 }
@@ -174,7 +191,9 @@ export async function fetchLektion(
   const raw: unknown = await res.json()
 
   if (typeof raw === 'object' && raw !== null && 'error' in raw) {
-    throw new Error('fallback')
+    const details = (raw as { error: string; details?: FallbackDetails }).details
+    console.error('[Hoy] API fallback:', details ?? raw)
+    throw new FallbackError(details)
   }
 
   const lesson = mapToLesson(modus, raw)
