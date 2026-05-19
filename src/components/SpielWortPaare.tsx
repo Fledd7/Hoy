@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { recordVocabAnswer } from '../lib/vocabTracking'
 
 interface VocabPair {
   es: string
@@ -60,13 +61,13 @@ export default function SpielWortPaare({ vocab, onFinish }: Props) {
     const cardB = cards.find(c => c.id === idB)!
 
     if (cardA.pairKey === cardB.pairKey) {
+      recordVocabAnswer(cardA.pairKey, true)
       const newMatched = [...matched, cardA.pairKey]
       setMatched(newMatched)
       setRevealed([])
       setLocked(false)
       if (newMatched.length >= totalPairs) {
         setDone(true)
-        setTimeout(() => onFinish(), 800)
       }
     } else {
       setTimeout(() => {
@@ -76,10 +77,37 @@ export default function SpielWortPaare({ vocab, onFinish }: Props) {
     }
   }
 
+  useEffect(() => {
+    if (!done) return
+    const t = setTimeout(onFinish, 8000)
+    return () => clearTimeout(t)
+  }, [done, onFinish])
+
+  function handleNochmal() {
+    setRevealed([])
+    setMatched([])
+    setLocked(false)
+    setDone(false)
+  }
+
   if (done) {
     return (
-      <div className="fade-in flex flex-col items-center justify-center min-h-[60vh] gap-3">
+      <div className="fade-in flex flex-col items-center justify-center min-h-[60vh] gap-4 px-4">
         <p className="font-serif text-[26px] font-semibold text-text text-center">Alle Paare gefunden!</p>
+        <div className="flex flex-col gap-3 w-full max-w-[320px] mt-2">
+          <button
+            onClick={handleNochmal}
+            className="w-full py-4 rounded-[16px] bg-accent text-white text-[15px] font-semibold tap-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            Nochmal
+          </button>
+          <button
+            onClick={onFinish}
+            className="w-full py-4 rounded-[16px] border border-accent text-accent text-[15px] font-semibold tap-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            Zurück
+          </button>
+        </div>
       </div>
     )
   }

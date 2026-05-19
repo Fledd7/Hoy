@@ -48,9 +48,9 @@ export function getModusKonfiguration(modus: EnergyMode, phase: AnfaengerPhase):
   if (phase === 'phase1') {
     const configs: Record<EnergyMode, ModusKonfiguration> = {
       muede: { verfuegbar: true, sublabel: 'Erstes Spanisch – ganz sanft' },
-      okay: { verfuegbar: true, sublabel: 'Wörter lernen + kleines Spiel' },
-      fit: { verfuegbar: true, sublabel: 'Vokabeln mit Bildern kennenlernen' },
-      erzaehl: { verfuegbar: false, sublabel: 'Noch nicht freigeschaltet' },
+      okay: { verfuegbar: true, sublabel: 'Bilder erkennen' },
+      fit: { verfuegbar: true, sublabel: 'Wörter zusammen finden' },
+      erzaehl: { verfuegbar: false, sublabel: 'Bald verfügbar' },
     }
     return configs[modus]
   }
@@ -58,7 +58,7 @@ export function getModusKonfiguration(modus: EnergyMode, phase: AnfaengerPhase):
   // phase2
   const configs: Record<EnergyMode, ModusKonfiguration> = {
     muede: { verfuegbar: true, sublabel: 'Kurzer Lese-Snack, 2 Minuten' },
-    okay: { verfuegbar: true, sublabel: 'Lektion + Wörter in Reihenfolge' },
+    okay: { verfuegbar: true, sublabel: 'Lücken füllen' },
     fit: { verfuegbar: true, sublabel: 'Dialog + Vokabeln üben' },
     erzaehl: { verfuegbar: true, sublabel: 'Dein Tag auf Spanisch' },
   }

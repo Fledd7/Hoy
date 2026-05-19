@@ -218,17 +218,24 @@ function TypeVocabCard({ es, de, onResult }: { es: string; de: string; onResult:
 
   function handleSubmit() {
     if (submitted) return
-    const isCorrect = isCloseMatch(input.trim(), de)
+    const isCorrect = isCloseMatch(input.trim(), es)
     setCorrect(isCorrect)
     setSubmitted(true)
     recordVocabAnswer(es, isCorrect)
-    setTimeout(() => onResult(isCorrect), 800)
+    if (isCorrect) setTimeout(() => onResult(true), 800)
+  }
+
+  function handleGiveUp() {
+    if (submitted) return
+    setCorrect(false)
+    setSubmitted(true)
+    recordVocabAnswer(es, false)
   }
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-xl font-semibold text-text text-center py-4">{es}</p>
-      <p className="text-sm text-muted text-center">Schreib die deutsche Übersetzung</p>
+      <p className="text-xl font-semibold text-text text-center py-4">{de}</p>
+      <p className="text-sm text-muted text-center">Schreib das spanische Wort</p>
       <input
         type="text"
         value={input}
@@ -245,11 +252,24 @@ function TypeVocabCard({ es, de, onResult }: { es: string; de: string; onResult:
         }`}
       />
       {submitted && !correct && (
-        <p className="text-sm text-muted fade-in">Richtig: <span className="font-semibold text-text">{de}</span></p>
+        <p className="text-sm text-muted fade-in">Richtig: <span className="font-semibold text-text">{es}</span></p>
       )}
       {!submitted && (
-        <Button variant="primary" fullWidth onClick={handleSubmit} disabled={!input.trim()}>
-          Prüfen
+        <>
+          <Button variant="primary" fullWidth onClick={handleSubmit} disabled={!input.trim()}>
+            Prüfen
+          </Button>
+          <button
+            onClick={handleGiveUp}
+            className="text-sm text-[#6B6B6B] underline underline-offset-2 text-center mt-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+          >
+            Ich weiß es nicht
+          </button>
+        </>
+      )}
+      {submitted && !correct && (
+        <Button variant="primary" fullWidth onClick={() => onResult(false)}>
+          Weiter
         </Button>
       )}
     </div>
@@ -283,7 +303,7 @@ function TiredVocabStep({ vocab, onFinish }: { vocab: { es: string; de: string }
       <div className="flex justify-between items-center">
         <p className="text-[13px] text-muted">Vokabeln {index + 1} / {vocab.length}</p>
       </div>
-      {level === 'vertraut' ? (
+      {level === 'neu' ? (
         <FlipCard key={item.es} es={item.es} de={item.de} onResult={handleResult} />
       ) : level === 'lerntief' ? (
         <McqVocabCard key={item.es} es={item.es} de={item.de} allVocab={vocab} onResult={handleResult} />
@@ -520,6 +540,14 @@ function FitVocabInput({ vocab, onFinish }: { vocab: { es: string; de: string }[
     recordVocabAnswer(item.es, isCorrect)
   }
 
+  function handleGiveUp() {
+    if (submitted) return
+    const item = vocab[index]
+    setCorrect(false)
+    setSubmitted(true)
+    recordVocabAnswer(item.es, false)
+  }
+
   function handleNext() {
     if (index + 1 >= vocab.length) {
       navigator.vibrate?.(10)
@@ -581,9 +609,17 @@ function FitVocabInput({ vocab, onFinish }: { vocab: { es: string; de: string }[
         )}
       </Card>
       {!submitted ? (
-        <Button variant="primary" fullWidth onClick={handleSubmit} disabled={!input.trim()}>
-          Prüfen
-        </Button>
+        <>
+          <Button variant="primary" fullWidth onClick={handleSubmit} disabled={!input.trim()}>
+            Prüfen
+          </Button>
+          <button
+            onClick={handleGiveUp}
+            className="text-sm text-[#6B6B6B] underline underline-offset-2 text-center mt-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+          >
+            Ich weiß es nicht
+          </button>
+        </>
       ) : (
         <Button variant={index === vocab.length - 1 ? 'primary' : 'secondary'} fullWidth onClick={handleNext}>
           {index === vocab.length - 1 ? 'Fertig' : 'Weiter →'}
