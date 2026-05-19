@@ -61,7 +61,11 @@ function dummyForMode(modus: EnergyMode): Lesson {
 
 // ─── API response types ───────────────────────────────────────────────────────
 
-interface MuedeResponse {
+interface WithSchluesselwort {
+  schluesselwort?: { es: string; de: string }
+}
+
+interface MuedeResponse extends WithSchluesselwort {
   text_es: string
   text_de: string
   vokabeln: VocabItem[]
@@ -73,7 +77,7 @@ interface OkayFrage {
   richtig: number
 }
 
-interface OkayResponse {
+interface OkayResponse extends WithSchluesselwort {
   text_es: string
   text_de: string
   fragen: OkayFrage[]
@@ -85,34 +89,29 @@ interface FitDialogLine {
   de: string
 }
 
-interface FitResponse {
+interface FitResponse extends WithSchluesselwort {
   dialog: FitDialogLine[]
   vokabeln: VocabItem[]
 }
 
-interface ErzaehlResponse {
+interface ErzaehlResponse extends WithSchluesselwort {
   saetze: { es: string; de: string }[]
   vokabeln: VocabItem[]
 }
 
-interface WithSchluesselwort {
-  schluesselwort?: { es: string; de: string }
-}
-
-function extractSchluesselwort(d: WithSchluesselwort): { es: string; de: string } | undefined {
-  const s = d.schluesselwort
-  if (s && typeof s.es === 'string' && typeof s.de === 'string') return { es: s.es, de: s.de }
+function extractSchluesselwort(raw: WithSchluesselwort): VocabItem | undefined {
+  if (raw.schluesselwort?.es && raw.schluesselwort?.de) return raw.schluesselwort
   return undefined
 }
 
 function mapToLesson(modus: EnergyMode, raw: unknown): Lesson {
   if (modus === 'muede') {
-    const d = raw as MuedeResponse & WithSchluesselwort
+    const d = raw as MuedeResponse
     if (!d.text_es || !d.text_de || !Array.isArray(d.vokabeln)) throw new Error('invalid muede')
     return { mode: 'muede', text: d.text_es, translation: d.text_de, vocab: d.vokabeln, schluesselwort: extractSchluesselwort(d) }
   }
   if (modus === 'okay') {
-    const d = raw as OkayResponse & WithSchluesselwort
+    const d = raw as OkayResponse
     if (!d.text_es || !d.text_de || !Array.isArray(d.fragen)) throw new Error('invalid okay')
     return {
       mode: 'okay',
@@ -123,7 +122,7 @@ function mapToLesson(modus: EnergyMode, raw: unknown): Lesson {
     }
   }
   if (modus === 'fit') {
-    const d = raw as FitResponse & WithSchluesselwort
+    const d = raw as FitResponse
     if (!Array.isArray(d.dialog) || !Array.isArray(d.vokabeln)) throw new Error('invalid fit')
     return {
       mode: 'fit',
@@ -133,7 +132,7 @@ function mapToLesson(modus: EnergyMode, raw: unknown): Lesson {
     }
   }
   // erzaehl
-  const d = raw as ErzaehlResponse & WithSchluesselwort
+  const d = raw as ErzaehlResponse
   if (!Array.isArray(d.saetze) || !Array.isArray(d.vokabeln)) throw new Error('invalid erzaehl')
   return { mode: 'erzaehl', saetze: d.saetze, vocab: d.vokabeln, schluesselwort: extractSchluesselwort(d) }
 }

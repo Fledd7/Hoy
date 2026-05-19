@@ -1,234 +1,215 @@
-import { useEffect, useRef, useState } from 'react'
-import type { VocabEntry } from '../lib/vocabTracking'
+import { useCallback, useEffect, useState } from 'react'
 import { recordVocabAnswer } from '../lib/vocabTracking'
 import { isCloseMatch } from '../lib/stringUtils'
 import Button from './Button'
-import Card from './Card'
 
-interface Props {
-  vocab: VocabEntry[]
-  etappe: number
-  onNochmal: () => void
-  onZurueck: () => void
+interface VocabPair {
+  es: string
+  de: string
 }
 
-interface Lueckensatz {
+interface Luecke {
   satz: string
   loesung: string
   hilfe_de: string
-  vocabEs: string
 }
 
-interface ApiResponse {
-  saetze: Array<{ satz: string; loesung: string; hilfe_de: string }>
+interface Props {
+  vocab: VocabPair[]
+  etappe: number
+  onFinish: () => void
 }
 
-type LoadState = 'loading' | 'ready' | 'error'
-
-export default function SpielLueckenFuellen({ vocab, etappe, onNochmal, onZurueck }: Props) {
-  const [loadState, setLoadState] = useState<LoadState>('loading')
-  const [saetze, setSaetze] = useState<Lueckensatz[]>([])
+export default function SpielLueckenFuellen({ vocab, etappe, onFinish }: Props) {
+  const [luecken, setLuecken] = useState<Luecke[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const [index, setIndex] = useState(0)
-  const [input, setInput] = useState('')
-  const [result, setResult] = useState<'correct' | 'close' | 'wrong' | null>(null)
-  const [richtigCount, setRichtigCount] = useState(0)
+  const [correct, setCorrect] = useState(0)
   const [done, setDone] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const autoRedirectRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const selected = vocab.slice(0, 5)
+  const usedVocab = vocab.slice(0, 5)
 
   useEffect(() => {
-    void fetchSaetze()
-    return () => {
-      if (autoRedirectRef.current) clearTimeout(autoRedirectRef.current)
-    }
+    const controller = new AbortController()
+    fetch('/api/luecken', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vokabeln: usedVocab, etappe }),
+      signal: controller.signal,
+    })
+      .then(r => r.json())
+      .then((data: { saetze: Luecke[] }) => {
+        setLuecken(data.saetze ?? [])
+        setLoading(false)
+      })
+      .catch(() => { setError(true); setLoading(false) })
+    return () => controller.abort()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function fetchSaetze() {
-    setLoadState('loading')
-    try {
-      const res = await fetch('/api/luecken', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          vokabeln: selected.map(v => ({ es: v.es, de: v.de })),
-          etappe,
-        }),
-      })
-      if (!res.ok) throw new Error('api_error')
-      const data = (await res.json()) as ApiResponse
-      if (!Array.isArray(data.saetze) || data.saetze.length === 0) throw new Error('invalid')
-      setSaetze(
-        data.saetze.slice(0, 5).map((s, i) => ({
-          ...s,
-          vocabEs: selected[i]?.es ?? '',
-        })),
-      )
-      setLoadState('ready')
-    } catch {
-      setLoadState('error')
-    }
-  }
+  const handleNochmal = useCallback(() => {
+    setIndex(0)
+    setCorrect(0)
+    setDone(false)
+  }, [])
 
-  function handleSubmit() {
-    if (!input.trim() || result !== null) return
-    const satz = saetze[index]
-    const trimmed = input.trim()
-    const exact = isCloseMatch(trimmed, satz.loesung)
-    const res = exact ? 'correct' : isCloseMatch(trimmed, satz.loesung.split(' ').pop() ?? satz.loesung) ? 'close' : 'wrong'
-    setResult(res)
-    recordVocabAnswer(satz.vocabEs, res === 'correct' || res === 'close')
-    if (res === 'correct' || res === 'close') setRichtigCount(c => c + 1)
-    navigator.vibrate?.(res === 'correct' ? 10 : 5)
-  }
+  useEffect(() => {
+    if (!done) return
+    const t = setTimeout(onFinish, 8000)
+    return () => clearTimeout(t)
+  }, [done, onFinish])
 
-  function handleWeiter() {
-    const next = index + 1
-    if (next >= saetze.length) {
-      setDone(true)
-      autoRedirectRef.current = setTimeout(onZurueck, 8000)
-    } else {
-      setIndex(next)
-      setInput('')
-      setResult(null)
-      setTimeout(() => inputRef.current?.focus(), 50)
-    }
-  }
-
-  function renderSatzWithGap(satz: string, loesung: string, revealed: boolean) {
-    const parts = satz.split('___')
+  if (loading) {
     return (
-      <p className="font-serif text-[20px] text-text text-center leading-relaxed">
-        {parts[0]}
-        <span
-          className="inline-block rounded-[6px] px-2 py-0.5 mx-1 min-w-[60px] text-center align-baseline"
-          style={{ background: '#F3E8E5', borderBottom: '2px solid #C2553D' }}
-        >
-          {revealed ? loesung : '___'}
-        </span>
-        {parts[1] ?? ''}
-      </p>
-    )
-  }
-
-  if (loadState === 'loading') {
-    return (
-      <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#FAF7F2] to-[#F5F1EB] items-center justify-center px-6 gap-4">
-        <div className="flex flex-col gap-3 w-full max-w-[340px]">
-          <div className="h-6 bg-[#E5E2DD] rounded animate-pulse w-3/4 mx-auto" />
-          <div className="h-6 bg-[#E5E2DD] rounded animate-pulse w-full mx-auto" />
-          <div className="h-12 bg-[#E5E2DD] rounded-btn animate-pulse w-full mt-4" />
-        </div>
+      <div className="flex flex-col gap-4 pt-2">
+        <div className="h-5 bg-[#E5E2DD] rounded animate-pulse w-4/5" />
+        <div className="h-5 bg-[#E5E2DD] rounded animate-pulse w-full" />
+        <div className="h-5 bg-[#E5E2DD] rounded animate-pulse w-2/3" />
       </div>
     )
   }
 
-  if (loadState === 'error') {
+  if (error || luecken.length === 0) {
     return (
-      <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#FAF7F2] to-[#F5F1EB] items-center justify-center px-6 gap-4">
-        <p className="text-muted text-center">Konnte keine Übung laden. Versuch es nochmal.</p>
-        <div className="flex flex-col gap-3 w-full max-w-[340px]">
-          <Button variant="primary" fullWidth onClick={() => void fetchSaetze()}>Nochmal versuchen</Button>
-          <Button variant="ghost" fullWidth onClick={onZurueck}>Zurück</Button>
-        </div>
+      <div className="flex flex-col items-center gap-4 pt-8">
+        <p className="text-muted text-center">Konnte die Lücken nicht laden.</p>
+        <Button variant="primary" fullWidth onClick={onFinish}>Weiter</Button>
       </div>
     )
   }
 
   if (done) {
     return (
-      <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#FAF7F2] to-[#F5F1EB] items-center justify-center px-8 gap-4 fade-in">
-        <p className="font-serif text-[28px] font-semibold text-text text-center">Schön gespielt.</p>
-        <p className="text-[16px] text-muted text-center">
-          Du hast {richtigCount} von {saetze.length} Lücken richtig gefüllt.
+      <div className="fade-in flex flex-col items-center justify-center min-h-[60vh] gap-4 px-4">
+        <p className="font-serif text-[26px] font-semibold text-text text-center">Schön gespielt.</p>
+        <p className="text-[15px] text-muted text-center">
+          Du hast {correct} von {luecken.length} Lücken richtig gefüllt.
         </p>
-        <div className="flex flex-col gap-3 w-full max-w-[340px] mt-4">
-          <Button variant="primary" fullWidth onClick={() => {
-            if (autoRedirectRef.current) clearTimeout(autoRedirectRef.current)
-            onNochmal()
-          }}>
+        <div className="flex flex-col gap-3 w-full max-w-[320px] mt-2">
+          <button
+            onClick={handleNochmal}
+            className="w-full py-4 rounded-[16px] bg-accent text-white text-[15px] font-semibold tap-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
             Nochmal
-          </Button>
-          <Button variant="secondary" fullWidth onClick={() => {
-            if (autoRedirectRef.current) clearTimeout(autoRedirectRef.current)
-            onZurueck()
-          }}>
+          </button>
+          <button
+            onClick={onFinish}
+            className="w-full py-4 rounded-[16px] border border-accent text-accent text-[15px] font-semibold tap-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
             Zurück
-          </Button>
+          </button>
         </div>
       </div>
     )
   }
 
-  const satz = saetze[index]
-  const isLastRound = index === saetze.length - 1
+  return (
+    <LueckeRunde
+      key={index}
+      luecke={luecken[index]}
+      roundIndex={index}
+      totalRounds={luecken.length}
+      vocabEs={usedVocab[index]?.es ?? ''}
+      onResult={(wasCorrect) => {
+        const key = luecken[index]?.loesung || usedVocab[index]?.es
+        if (key) recordVocabAnswer(key, wasCorrect)
+        if (wasCorrect) setCorrect(c => c + 1)
+        if (index + 1 >= luecken.length) {
+          setDone(true)
+        } else {
+          setIndex(i => i + 1)
+        }
+      }}
+    />
+  )
+}
+
+function LueckeRunde({
+  luecke,
+  roundIndex,
+  totalRounds,
+  onResult,
+}: {
+  luecke: Luecke
+  roundIndex: number
+  totalRounds: number
+  vocabEs: string
+  onResult: (correct: boolean) => void
+}) {
+  const [input, setInput] = useState('')
+  const [submitted, setSubmitted] = useState(false)
+  const [correct, setCorrect] = useState(false)
+
+  const parts = luecke.satz.split('___')
+
+  function handleSubmit() {
+    if (submitted) return
+    const isCorrect = isCloseMatch(input.trim(), luecke.loesung)
+    setCorrect(isCorrect)
+    setSubmitted(true)
+  }
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#FAF7F2] to-[#F5F1EB] max-w-content mx-auto px-5 pt-5 pb-10">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="font-serif text-[22px] font-semibold text-text">Lücken füllen</h1>
-        <span className="text-[13px] text-muted">Runde {index + 1} von {saetze.length}</span>
+    <div className="fade-in flex flex-col gap-5">
+      <div className="flex justify-between items-center">
+        <p className="text-[13px] text-muted uppercase tracking-wide" style={{ letterSpacing: '0.06em' }}>
+          Lücken füllen
+        </p>
+        <p className="text-[13px] text-muted">{roundIndex + 1} / {totalRounds}</p>
       </div>
 
-      <div className="flex justify-center gap-1.5 mb-6">
-        {saetze.map((_, i) => (
+      <div className="bg-white border border-[#E2D7C8]/50 rounded-[20px] px-5 py-5 shadow-card">
+        <p className="text-[13px] text-muted mb-2">{luecke.hilfe_de}</p>
+        <p className="text-lg text-text font-medium leading-relaxed">
+          {parts[0]}
           <span
-            key={i}
-            className={`rounded-full transition-all duration-200 ${
-              i === index ? 'w-5 h-2 bg-accent' : i < index ? 'w-2 h-2 bg-[#C2553D]/30' : 'w-2 h-2 bg-[#E0DDD8]'
+            className={`inline-block border-b-2 px-1 font-semibold ${
+              submitted
+                ? correct
+                  ? 'border-[#7CA982] text-[#4A7A50]'
+                  : 'border-[#C25555] text-[#C25555] line-through'
+                : 'border-accent text-accent'
             }`}
-          />
-        ))}
+            style={{ minWidth: 60 }}
+          >
+            {submitted ? (correct ? input : input) : input || '___'}
+          </span>
+          {parts[1]}
+        </p>
+        {submitted && !correct && (
+          <p className="text-sm text-muted mt-2 fade-in">
+            Richtig: <span className="font-semibold text-text">{luecke.loesung}</span>
+          </p>
+        )}
       </div>
 
-      <Card className="fade-in" key={index}>
-        <div className="flex flex-col items-center gap-4 py-2">
-          {renderSatzWithGap(satz.satz, satz.loesung, result !== null)}
-          <p className="text-[13px] text-muted italic">{satz.hilfe_de}</p>
-        </div>
+      <input
+        type="text"
+        value={input}
+        onChange={e => setInput(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter' && !submitted) handleSubmit() }}
+        disabled={submitted}
+        placeholder="Fehlende Wörter eingeben …"
+        autoFocus
+        className={`w-full border rounded-card px-4 py-3 text-base text-text placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent ${
+          submitted
+            ? correct
+              ? 'border-[#7CA982] bg-[#F0F7F1]'
+              : 'border-[#C25555] bg-[#FDF0F0]'
+            : 'border-[#E0DDD8] bg-white'
+        }`}
+      />
 
-        <div className="mt-5 flex flex-col gap-3">
-          {result === null ? (
-            <>
-              <input
-                ref={inputRef}
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleSubmit() }}
-                placeholder="Auf Spanisch tippen…"
-                autoComplete="off"
-                autoCorrect="off"
-                spellCheck={false}
-                className="w-full bg-white border border-[#E0DDD8] rounded-btn px-4 py-3 text-base text-text placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
-                style={{
-                  borderColor: result === null ? undefined : '#C2553D',
-                }}
-              />
-              <Button variant="primary" fullWidth onClick={handleSubmit} disabled={!input.trim()}>
-                Prüfen
-              </Button>
-            </>
-          ) : (
-            <>
-              <div
-                className={`rounded-btn px-4 py-3 text-sm font-medium ${
-                  result === 'wrong'
-                    ? 'bg-[#F5F1EB] text-muted border border-[#E0DDD8]'
-                    : 'bg-[#FBF0EE] text-accent border border-accent/30'
-                }`}
-              >
-                {result === 'correct' && <span>Richtig: <span className="font-semibold">{satz.loesung}</span></span>}
-                {result === 'close' && <span>Fast! Die Antwort: <span className="font-semibold">{satz.loesung}</span></span>}
-                {result === 'wrong' && <span>Die Antwort: <span className="font-semibold text-text">{satz.loesung}</span></span>}
-              </div>
-              <Button variant={isLastRound ? 'primary' : 'secondary'} fullWidth onClick={handleWeiter}>
-                {isLastRound ? 'Fertig' : 'Weiter →'}
-              </Button>
-            </>
-          )}
-        </div>
-      </Card>
+      {!submitted ? (
+        <Button variant="primary" fullWidth onClick={handleSubmit} disabled={!input.trim()}>
+          Prüfen
+        </Button>
+      ) : (
+        <Button variant="primary" fullWidth onClick={() => onResult(correct)}>
+          Weiter
+        </Button>
+      )}
     </div>
   )
 }

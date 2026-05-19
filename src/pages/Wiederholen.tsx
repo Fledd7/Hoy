@@ -1,62 +1,96 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Grid3X3, Pencil } from 'lucide-react'
-import { getVocabForReview } from '../lib/vocabTracking'
-import type { VocabEntry } from '../lib/vocabTracking'
 import { getUser } from '../lib/storage'
+import { getVocabForReview } from '../lib/vocabTracking'
+import { ANFAENGER_VOKABULAR } from '../lib/anfaengerVokabular'
 import SpielWortPaare from '../components/SpielWortPaare'
 import SpielLueckenFuellen from '../components/SpielLueckenFuellen'
-import Button from '../components/Button'
+import SpielBildMatching from '../components/SpielBildMatching'
+import SpielReihenfolge from '../components/SpielReihenfolge'
 
-type Screen = 'auswahl' | 'wortpaare' | 'luecken'
+type SpielId = 'wort_paare' | 'luecken' | 'bild_matching' | 'reihenfolge'
 
-const MIN_VOCAB = 5
-const MAX_VOCAB = 8
+const SPIELE: { id: SpielId; label: string; beschreibung: string }[] = [
+  { id: 'wort_paare',     label: 'Wort-Paare',        beschreibung: 'Spanisch und Deutsch verbinden' },
+  { id: 'luecken',        label: 'Lücken füllen',     beschreibung: 'Fehlende Wörter ergänzen' },
+  { id: 'bild_matching',  label: 'Bild-Raten',         beschreibung: 'Emoji dem Wort zuordnen' },
+  { id: 'reihenfolge',    label: 'Reihenfolge',        beschreibung: 'Sätze in die richtige Reihenfolge' },
+]
 
 export default function Wiederholen() {
   const navigate = useNavigate()
   const user = getUser()
   const etappe = user?.etappe ?? 1
 
-  const [screen, setScreen] = useState<Screen>('auswahl')
-  const [vocab, setVocab] = useState<VocabEntry[]>(() => {
-    const all = getVocabForReview(MAX_VOCAB)
-    // Shuffle to randomize each session
-    return [...all].sort(() => Math.random() - 0.5).slice(0, MAX_VOCAB)
-  })
+  const reviewVocab = getVocabForReview(8)
+  const vocabForGames = reviewVocab.length >= 4
+    ? reviewVocab
+    : ANFAENGER_VOKABULAR.slice().sort(() => Math.random() - 0.5).slice(0, 8)
 
-  function refreshVocab() {
-    const all = getVocabForReview(MAX_VOCAB)
-    setVocab([...all].sort(() => Math.random() - 0.5).slice(0, MAX_VOCAB))
+  const anfaengerVocabForBild = ANFAENGER_VOKABULAR.slice().sort(() => Math.random() - 0.5).slice(0, 8)
+
+  const [activeSpiel, setActiveSpiel] = useState<SpielId | null>(null)
+
+  function handleSpielFinish() {
+    setActiveSpiel(null)
   }
 
-  function handleNochmal() {
-    refreshVocab()
-    setScreen('auswahl')
-  }
-
-  if (screen === 'wortpaare') {
+  if (activeSpiel === 'wort_paare') {
     return (
-      <SpielWortPaare
-        vocab={vocab}
-        onNochmal={handleNochmal}
-        onZurueck={() => setScreen('auswahl')}
-      />
+      <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#FAF7F2] to-[#F5F1EB] max-w-content mx-auto px-5 pt-5 pb-10">
+        <button
+          onClick={() => setActiveSpiel(null)}
+          className="text-muted text-sm tap-scale self-start mb-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+        >
+          ← Zurück
+        </button>
+        <SpielWortPaare vocab={vocabForGames.slice(0, 6)} onFinish={handleSpielFinish} />
+      </div>
     )
   }
 
-  if (screen === 'luecken') {
+  if (activeSpiel === 'luecken') {
     return (
-      <SpielLueckenFuellen
-        vocab={vocab}
-        etappe={etappe}
-        onNochmal={handleNochmal}
-        onZurueck={() => setScreen('auswahl')}
-      />
+      <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#FAF7F2] to-[#F5F1EB] max-w-content mx-auto px-5 pt-5 pb-10">
+        <button
+          onClick={() => setActiveSpiel(null)}
+          className="text-muted text-sm tap-scale self-start mb-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+        >
+          ← Zurück
+        </button>
+        <SpielLueckenFuellen vocab={vocabForGames.slice(0, 5)} etappe={etappe} onFinish={handleSpielFinish} />
+      </div>
     )
   }
 
-  // ─── Spiel-Auswahl ────────────────────────────────────────────────────────
+  if (activeSpiel === 'bild_matching') {
+    return (
+      <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#FAF7F2] to-[#F5F1EB] max-w-content mx-auto px-5 pt-5 pb-10">
+        <button
+          onClick={() => setActiveSpiel(null)}
+          className="text-muted text-sm tap-scale self-start mb-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+        >
+          ← Zurück
+        </button>
+        <SpielBildMatching vocab={anfaengerVocabForBild} onFinish={handleSpielFinish} />
+      </div>
+    )
+  }
+
+  if (activeSpiel === 'reihenfolge') {
+    return (
+      <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#FAF7F2] to-[#F5F1EB] max-w-content mx-auto px-5 pt-5 pb-10">
+        <button
+          onClick={() => setActiveSpiel(null)}
+          className="text-muted text-sm tap-scale self-start mb-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+        >
+          ← Zurück
+        </button>
+        <SpielReihenfolge etappe={etappe} onFinish={handleSpielFinish} />
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#FAF7F2] to-[#F5F1EB] max-w-content mx-auto px-5 pt-5 pb-10">
       <button
@@ -67,63 +101,22 @@ export default function Wiederholen() {
         ← Zurück
       </button>
 
-      <h1 className="font-serif text-[28px] font-semibold text-text leading-tight mb-1">Wiederholen</h1>
-      <p className="text-[14px] text-muted mb-8">Spiel dich durch deine Wörter.</p>
+      <h1 className="font-serif text-[28px] font-semibold text-text leading-tight mb-2">Wiederholen</h1>
+      <p className="text-[14px] text-muted mb-8">Wähle ein Spiel zum Üben.</p>
 
-      {vocab.length < MIN_VOCAB ? (
-        <div className="flex flex-col items-center text-center gap-4 pt-8">
-          <p className="text-muted text-base leading-relaxed">
-            Komm später wieder. Du brauchst mehr gelernte Wörter, bevor du wiederholen kannst.
-          </p>
-          <Button variant="secondary" onClick={() => navigate('/heute')}>
-            Zurück
-          </Button>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-4">
-          <SpielKarte
-            icon={<Grid3X3 size={24} className="text-accent" />}
-            titel="Wort-Paare"
-            beschreibung="Finde zusammengehörende Wörter"
-            onClick={() => setScreen('wortpaare')}
-          />
-          <SpielKarte
-            icon={<Pencil size={24} className="text-accent" />}
-            titel="Lücken füllen"
-            beschreibung="Vervollständige die Sätze"
-            onClick={() => setScreen('luecken')}
-          />
-        </div>
-      )}
+      <div className="grid grid-cols-2 gap-3">
+        {SPIELE.map(spiel => (
+          <button
+            key={spiel.id}
+            onClick={() => setActiveSpiel(spiel.id)}
+            className="bg-white border border-[#E0DDD8] rounded-[16px] px-4 py-5 text-left tap-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            style={{ boxShadow: '0 1px 4px rgba(26,26,26,0.04)' }}
+          >
+            <p className="font-semibold text-[15px] text-text leading-tight">{spiel.label}</p>
+            <p className="text-[12px] text-muted mt-1">{spiel.beschreibung}</p>
+          </button>
+        ))}
+      </div>
     </div>
-  )
-}
-
-function SpielKarte({
-  icon,
-  titel,
-  beschreibung,
-  onClick,
-}: {
-  icon: React.ReactNode
-  titel: string
-  beschreibung: string
-  onClick: () => void
-}) {
-  return (
-    <button
-      onClick={() => { navigator.vibrate?.(10); onClick() }}
-      className="w-full bg-white rounded-[18px] px-5 py-5 text-left tap-lift focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 flex items-center gap-4"
-      style={{
-        border: '1px solid rgba(226,215,200,0.5)',
-        boxShadow: '0 1px 2px rgba(26,26,26,0.04), 0 4px 16px rgba(26,26,26,0.06)',
-      }}
-    >
-      <span className="flex-shrink-0">{icon}</span>
-      <span className="flex-1 min-w-0">
-        <span className="block font-serif text-[20px] font-semibold text-text leading-tight">{titel}</span>
-        <span className="block text-[13px] text-muted mt-0.5">{beschreibung}</span>
-      </span>
-    </button>
   )
 }

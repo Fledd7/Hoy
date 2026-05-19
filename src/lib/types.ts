@@ -6,6 +6,8 @@ export interface UserData {
   letztesOeffnen: string;
   etappe?: 1 | 2 | 3 | 4 | 5;
   lektionenInEtappe?: number;
+  anfaengerPfadStart?: string | null;
+  anfaengerPfadAktiv?: boolean;
 }
 
 export type EnergyMode = 'muede' | 'okay' | 'fit' | 'erzaehl';
@@ -64,4 +66,3 @@ export interface LessonHistoryItem {
   modus: EnergyMode;
   content: Lesson;
 }
-

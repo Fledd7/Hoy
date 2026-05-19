@@ -2,14 +2,9 @@ export const config = { runtime: 'edge' }
 
 declare const process: { env: Record<string, string | undefined> }
 
-interface VocabItem {
-  es: string
-  de: string
-}
-
 interface RequestBody {
-  vokabeln: VocabItem[]
   etappe: number
+  anzahl: number
 }
 
 interface GeminiResponse {
@@ -19,11 +14,11 @@ interface GeminiResponse {
 }
 
 const ETAPPEN_NIVEAU: Record<number, string> = {
-  1: 'A1 – max 6 einfache Wörter pro Satz, nur Präsens',
-  2: 'A1–A2 – kurze alltagsnahe Sätze',
-  3: 'A2 – etwas komplexere Strukturen',
-  4: 'A2–B1 – alltagsnahe Sätze mit Vergangenheit',
-  5: 'B1+ – natürlichere, längere Sätze',
+  1: 'A1 – max 5 Wörter pro Satz, einfaches Präsens, Grundvokabular',
+  2: 'A1–A2 – kurze alltagsnahe Sätze mit 5-7 Wörtern',
+  3: 'A2 – etwas komplexere Strukturen, 6-8 Wörter',
+  4: 'A2–B1 – Sätze mit Vergangenheit, 7-9 Wörter',
+  5: 'B1+ – natürliche Sätze, 8-10 Wörter',
 }
 
 function extractJson(raw: string): string {
@@ -80,17 +75,17 @@ export default async function handler(request: Request): Promise<Response> {
     return new Response(JSON.stringify({ error: 'invalid_body' }), { status: 400 })
   }
 
-  const { vokabeln, etappe } = body
+  const { etappe, anzahl } = body
   const niveau = ETAPPEN_NIVEAU[etappe] ?? ETAPPEN_NIVEAU[1]
-  const schema = '{"saetze":[{"satz":"string mit ___ für die Lücke","loesung":"string","hilfe_de":"string"}]}'
+  const count = Math.min(Math.max(anzahl ?? 5, 1), 10)
+  const schema = '{"saetze":[{"satz":"string","uebersetzung":"string"}]}'
 
   const prompt =
-    `Du erstellst Spanisch-Lückentext-Übungen für deutschsprachige Lernende.\n` +
+    `Du erstellst Spanisch-Übungssätze für deutschsprachige Lernende.\n` +
     `Niveau: ${niveau}.\n` +
     `Antworte AUSSCHLIESSLICH mit validem JSON ohne Markdown-Blöcke.\n\n` +
-    `Erstelle für jedes der folgenden spanischen Wörter einen kurzen Satz (max 8 Wörter), ` +
-    `in dem das Wort durch ___ ersetzt ist. Gib auch die deutsche Übersetzungshilfe für den Kontext an.\n` +
-    `Wörter: ${vokabeln.map(v => `${v.es} (${v.de})`).join(', ')}.\n` +
+    `Erstelle genau ${count} einfache spanische Sätze zum Üben der Wortstellung, ` +
+    `jeder mit deutscher Übersetzung. Die Sätze sollen klar und alltagsnah sein.\n` +
     `JSON-Schema: ${schema}`
 
   let lastErr: unknown

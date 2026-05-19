@@ -265,7 +265,7 @@ export default function Profil() {
         >
           Alle Daten zurücksetzen
         </Button>
-        <p className="text-center text-[12px] text-[#9B9B9B] mt-8">Hoy v1.0.0</p>
+        <p className="text-center text-[12px] text-[#9B9B9B] mt-8">Hoy v1.1.1</p>
       </div>
     </div>
   )

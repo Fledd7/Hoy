@@ -1,3 +1,5 @@
+import { isCloseMatch } from './stringUtils'
+
 export type VocabLevel = 'neu' | 'lerntief' | 'vertraut'
 
 export interface VocabEntry {
@@ -10,8 +12,6 @@ export interface VocabEntry {
   level: VocabLevel
 }
 
-type VocabTracking = Record<string, VocabEntry>
-
 const VOCAB_TRACKING_KEY = 'hoy_vocabTracking'
 
 function computeLevel(entry: VocabEntry): VocabLevel {
@@ -20,80 +20,91 @@ function computeLevel(entry: VocabEntry): VocabLevel {
   return 'lerntief'
 }
 
-function load(): VocabTracking {
+function loadAll(): VocabEntry[] {
   try {
     const raw = localStorage.getItem(VOCAB_TRACKING_KEY)
-    return raw ? (JSON.parse(raw) as VocabTracking) : {}
+    if (!raw) return []
+    return JSON.parse(raw) as VocabEntry[]
   } catch {
-    return {}
+    return []
   }
 }
 
-function save(tracking: VocabTracking): void {
+function saveAll(entries: VocabEntry[]): void {
   try {
-    localStorage.setItem(VOCAB_TRACKING_KEY, JSON.stringify(tracking))
+    localStorage.setItem(VOCAB_TRACKING_KEY, JSON.stringify(entries))
   } catch {
     // storage unavailable
   }
 }
 
-export function recordVocabSeen(es: string, de: string): void {
-  const tracking = load()
+export function recordVocabSeen(items: { es: string; de: string }[]): void {
+  if (items.length === 0) return
+  const entries = loadAll()
   const now = new Date().toISOString()
-  const existing = tracking[es]
-  if (existing) {
-    existing.timesSeen += 1
-    existing.lastSeen = now
-    existing.level = computeLevel(existing)
-  } else {
-    tracking[es] = {
-      es,
-      de,
-      timesSeen: 1,
-      timesCorrect: 0,
-      firstSeen: now,
-      lastSeen: now,
-      level: 'neu',
+  const map = new Map(entries.map(e => [e.es, e]))
+
+  for (const item of items) {
+    const existing = map.get(item.es)
+    if (existing) {
+      existing.timesSeen += 1
+      existing.lastSeen = now
+      existing.level = computeLevel(existing)
+    } else {
+      const newEntry: VocabEntry = {
+        es: item.es,
+        de: item.de,
+        timesSeen: 1,
+        timesCorrect: 0,
+        firstSeen: now,
+        lastSeen: now,
+        level: 'neu',
+      }
+      map.set(item.es, newEntry)
     }
   }
-  save(tracking)
+
+  saveAll(Array.from(map.values()))
 }
 
-export function recordVocabAnswer(es: string, wasCorrect: boolean): void {
-  const tracking = load()
-  const entry = tracking[es]
+export function recordVocabAnswer(es: string, correct: boolean): void {
+  const entries = loadAll()
+  const now = new Date().toISOString()
+  const entry = entries.find(e => isCloseMatch(e.es, es) || e.es === es)
   if (!entry) return
-  if (wasCorrect) entry.timesCorrect += 1
+  entry.timesCorrect += correct ? 1 : 0
+  entry.lastSeen = now
   entry.level = computeLevel(entry)
-  save(tracking)
+  saveAll(entries)
 }
 
 export function getVocabLevel(es: string): VocabLevel {
-  return load()[es]?.level ?? 'neu'
-}
-
-export function getAllTrackedVocab(): VocabTracking {
-  return load()
+  const entries = loadAll()
+  const entry = entries.find(e => e.es === es)
+  return entry?.level ?? 'neu'
 }
 
 export function getReviewableCount(): number {
-  const tracking = load()
-  const threshold = Date.now() - 12 * 60 * 60 * 1000
-  return Object.values(tracking).filter(
-    e => new Date(e.lastSeen).getTime() < threshold && e.timesSeen >= 1,
-  ).length
+  const entries = loadAll()
+  const cutoff = Date.now() - 12 * 60 * 60 * 1000
+  return entries.filter(e => e.timesSeen >= 1 && new Date(e.lastSeen).getTime() <= cutoff).length
 }
 
 export function getVocabForReview(maxCount: number): VocabEntry[] {
-  const tracking = load()
-  const threshold = Date.now() - 12 * 60 * 60 * 1000
-  return Object.values(tracking)
-    .filter(e => new Date(e.lastSeen).getTime() < threshold && e.timesSeen >= 1)
-    .sort((a, b) => {
-      const ratioA = a.timesSeen > 0 ? a.timesCorrect / a.timesSeen : 0
-      const ratioB = b.timesSeen > 0 ? b.timesCorrect / b.timesSeen : 0
-      if (Math.abs(ratioA - ratioB) > 0.1) return ratioA - ratioB
-      return new Date(a.lastSeen).getTime() - new Date(b.lastSeen).getTime()
-    })
-    .slice(0, maxCount)
+  const entries = loadAll()
+  const cutoff = Date.now() - 12 * 60 * 60 * 1000
+  const reviewable = entries.filter(e => e.timesSeen >= 1 && new Date(e.lastSeen).getTime() <= cutoff)
+  reviewable.sort((a, b) => {
+    const ratioA = a.timesSeen > 0 ? a.timesCorrect / a.timesSeen : 0
+    const ratioB = b.timesSeen > 0 ? b.timesCorrect / b.timesSeen : 0
+    if (ratioA !== ratioB) return ratioA - ratioB
+    return new Date(a.lastSeen).getTime() - new Date(b.lastSeen).getTime()
+  })
+  return reviewable.slice(0, maxCount)
 }
+
+export function getAllTrackedVocab(): VocabEntry[] {
+  return loadAll()
+}
+
+export const VOCAB_TRACKING_STORAGE_KEY = VOCAB_TRACKING_KEY

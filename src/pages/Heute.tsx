@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BookOpen, Zap, Flame, MessageCircle, RotateCcw, ChevronRight } from 'lucide-react'
+import { BookOpen, Zap, Flame, MessageCircle, RotateCcw, Sparkles } from 'lucide-react'
 import ProfileIcon from '../components/ProfileIcon'
 import EnergyButton from '../components/EnergyButton'
 import ReturnBanner from '../components/ReturnBanner'
@@ -12,15 +12,16 @@ import {
   ensureEtappenMigration,
   getUser,
 } from '../lib/storage'
-import { ETAPPEN } from '../lib/etappen'
 import { getReviewableCount } from '../lib/vocabTracking'
+import { getAnfaengerPhase, getDayInPfad, getModusKonfiguration, isErzaehlModusVerfuegbar } from '../lib/anfaengerPfad'
+import { ETAPPEN } from '../lib/etappen'
 import type { EnergyMode, UserData } from '../lib/types'
 
-const ENERGIE_BUTTONS: { mode: EnergyMode; label: string; sublabel: string; icon: ReactNode }[] = [
-  { mode: 'muede',   label: 'Müde',          sublabel: 'Kurzer Lese-Snack, 2 Minuten',  icon: <BookOpen size={22} /> },
-  { mode: 'okay',    label: 'Okay',           sublabel: 'Lektion mit Verständnisfragen', icon: <Zap size={22} /> },
-  { mode: 'fit',     label: 'Fit',            sublabel: 'Dialog + Vokabeln, zwei Teile', icon: <Flame size={22} /> },
-  { mode: 'erzaehl', label: 'Erzähl mir was', sublabel: 'Dein Tag auf Spanisch',         icon: <MessageCircle size={22} /> },
+const BASE_BUTTONS: { mode: EnergyMode; label: string; icon: ReactNode }[] = [
+  { mode: 'muede',   label: 'Müde',          icon: <BookOpen size={22} /> },
+  { mode: 'okay',    label: 'Okay',           icon: <Zap size={22} /> },
+  { mode: 'fit',     label: 'Fit',            icon: <Flame size={22} /> },
+  { mode: 'erzaehl', label: 'Erzähl mir was', icon: <MessageCircle size={22} /> },
 ]
 
 const WEEKDAYS = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag']
@@ -55,31 +56,6 @@ function pickGreeting(): { es: string; de: string } {
   return RANDOM_GREETINGS[Math.floor(Math.random() * RANDOM_GREETINGS.length)]
 }
 
-function WiederholenButton({ available, onClick }: { available: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={available ? () => { navigator.vibrate?.(10); onClick() } : undefined}
-      disabled={!available}
-      className="w-full h-[72px] rounded-[18px] px-5 text-left flex items-center gap-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
-      style={{
-        border: '1px dashed #E0DBD6',
-        background: 'rgba(255,255,255,0.4)',
-        opacity: available ? 1 : 0.5,
-        cursor: available ? 'pointer' : 'not-allowed',
-      }}
-    >
-      <RotateCcw size={24} className="text-accent flex-shrink-0" style={{ opacity: available ? 1 : 0.6 }} />
-      <span className="flex-1 min-w-0">
-        <span className="block font-serif text-[20px] font-semibold text-text leading-tight">Wiederholen</span>
-        <span className="block text-[13px] text-muted mt-0.5">
-          {available ? 'Was du schon kennst, vertiefen' : 'Wird verfügbar, sobald du Vokabeln gelernt hast'}
-        </span>
-      </span>
-      {available && <ChevronRight size={18} className="text-muted flex-shrink-0" />}
-    </button>
-  )
-}
-
 export default function Heute() {
   const navigate = useNavigate()
   const [showBanner, setShowBanner] = useState(false)
@@ -108,6 +84,11 @@ export default function Heute() {
 
   const etappe = user?.etappe !== undefined ? ETAPPEN[user.etappe - 1] : null
   const lektionen = Math.min(user?.lektionenInEtappe ?? 0, 10)
+
+  const phase = getAnfaengerPhase()
+  const erzaehlVerfuegbar = isErzaehlModusVerfuegbar()
+  const dayInPfad = getDayInPfad()
+  const showPfadHint = phase !== 'inactive'
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#FAF7F2] to-[#F5F1EB]">
@@ -152,6 +133,24 @@ export default function Heute() {
           </button>
         )}
 
+        {/* Anfänger-Pfad Hinweis */}
+        {showPfadHint && (
+          <div
+            className="mb-5 flex items-center gap-2 px-4 py-3 rounded-[12px]"
+            style={{ backgroundColor: '#FFF4E6', border: '1px solid rgba(194,130,61,0.2)' }}
+          >
+            <Sparkles size={15} color="#C2813D" />
+            <p className="text-[13px] text-[#7A4E1A]">
+              Tag {dayInPfad} von 14 –{' '}
+              {phase === 'phase1'
+                ? 'Du bist im Anfänger-Pfad. Wir lassen es langsam angehen.'
+                : phase === 'phase2'
+                ? 'Weiter geht\'s'
+                : 'Du wirst bald in die nächste Etappe wechseln. Bleib dran.'}
+            </p>
+          </div>
+        )}
+
         <div className="mb-12">
           <p
             className="text-[13px] text-muted mb-3"
@@ -166,28 +165,49 @@ export default function Heute() {
         <ReturnBanner visible={showBanner} />
 
         <div className="flex flex-col gap-3">
-          {ENERGIE_BUTTONS.map((btn, idx) => (
-            <div key={btn.mode} className="enter-up" style={{ animationDelay: `${idx * 80}ms` }}>
-              <EnergyButton
-                label={btn.label}
-                sublabel={btn.sublabel}
-                icon={btn.icon}
-                doneToday={doneToday.has(btn.mode)}
-                onClick={() => handleEnergySelect(btn.mode)}
-              />
-            </div>
-          ))}
-        </div>
+          {BASE_BUTTONS.map((btn, idx) => {
+            const config = getModusKonfiguration(btn.mode, phase)
+            const isErzaehl = btn.mode === 'erzaehl'
+            const disabled = isErzaehl && !erzaehlVerfuegbar
+            return (
+              <div key={btn.mode} className="enter-up" style={{ animationDelay: `${idx * 80}ms` }}>
+                <EnergyButton
+                  label={btn.label}
+                  sublabel={config.sublabel}
+                  icon={btn.icon}
+                  doneToday={doneToday.has(btn.mode)}
+                  onClick={() => !disabled && handleEnergySelect(btn.mode)}
+                  disabled={disabled}
+                />
+              </div>
+            )
+          })}
 
-        {/* ─── Wiederholen ────────────────────────────────────────────── */}
-        <div className="enter-up mt-4" style={{ animationDelay: '360ms' }}>
-          <div className="flex justify-center mb-3">
-            <div style={{ width: '50%', height: 1, background: '#E5E2DD' }} />
+          {/* Wiederholen-Button */}
+          <div className="enter-up" style={{ animationDelay: `${BASE_BUTTONS.length * 80}ms` }}>
+            <button
+              onClick={() => navigate('/wiederholen')}
+              disabled={reviewableCount < 5}
+              className="w-full flex items-center gap-3 px-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-[16px] tap-scale"
+              style={{
+                height: 72,
+                background: 'rgba(255,255,255,0.4)',
+                border: '1px dashed #E0DBD6',
+                borderRadius: 16,
+                opacity: reviewableCount < 5 ? 0.5 : 1,
+              }}
+            >
+              <RotateCcw size={20} color="#9B9B9B" />
+              <div className="flex-1 text-left">
+                <p className="text-[15px] font-semibold text-text leading-tight">Wiederholen</p>
+                <p className="text-[12px] text-muted">
+                  {reviewableCount < 5
+                    ? 'Wird verfügbar, sobald du Vokabeln gelernt hast'
+                    : `${reviewableCount} Vokabeln bereit`}
+                </p>
+              </div>
+            </button>
           </div>
-          <WiederholenButton
-            available={reviewableCount >= 5}
-            onClick={() => navigate('/wiederholen')}
-          />
         </div>
 
       </div>
