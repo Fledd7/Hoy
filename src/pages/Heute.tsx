@@ -88,7 +88,7 @@ export default function Heute() {
   const phase = getAnfaengerPhase()
   const erzaehlVerfuegbar = isErzaehlModusVerfuegbar()
   const dayInPfad = getDayInPfad()
-  const showPfadHint = phase === 'phase1' || phase === 'phase2'
+  const showPfadHint = phase !== 'inactive'
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#FAF7F2] to-[#F5F1EB]">
@@ -141,7 +141,12 @@ export default function Heute() {
           >
             <Sparkles size={15} color="#C2813D" />
             <p className="text-[13px] text-[#7A4E1A]">
-              Tag {dayInPfad} von 14 – {phase === 'phase1' ? 'Erste Schritte' : 'Weiter geht\'s'}
+              Tag {dayInPfad} von 14 –{' '}
+              {phase === 'phase1'
+                ? 'Du bist im Anfänger-Pfad. Wir lassen es langsam angehen.'
+                : phase === 'phase2'
+                ? 'Weiter geht\'s'
+                : 'Du wirst bald in die nächste Etappe wechseln. Bleib dran.'}
             </p>
           </div>
         )}
@@ -187,7 +192,7 @@ export default function Heute() {
               style={{
                 height: 72,
                 background: 'rgba(255,255,255,0.4)',
-                border: '1.5px dashed #C0BAB4',
+                border: '1px dashed #E0DBD6',
                 borderRadius: 16,
                 opacity: reviewableCount < 5 ? 0.5 : 1,
               }}
@@ -197,7 +202,7 @@ export default function Heute() {
                 <p className="text-[15px] font-semibold text-text leading-tight">Wiederholen</p>
                 <p className="text-[12px] text-muted">
                   {reviewableCount < 5
-                    ? 'Noch zu wenig Vokabeln'
+                    ? 'Wird verfügbar, sobald du Vokabeln gelernt hast'
                     : `${reviewableCount} Vokabeln bereit`}
                 </p>
               </div>

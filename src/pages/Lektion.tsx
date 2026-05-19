@@ -4,6 +4,7 @@ import LessonView from '../components/LessonView'
 import SpielBildMatching from '../components/SpielBildMatching'
 import SpielWortPaare from '../components/SpielWortPaare'
 import SpielReihenfolge from '../components/SpielReihenfolge'
+import SpielLueckenFuellen from '../components/SpielLueckenFuellen'
 import Button from '../components/Button'
 import {
   getUser,
@@ -141,6 +142,7 @@ type PageState =
   | { kind: 'spiel_bild_matching' }
   | { kind: 'spiel_wort_paare' }
   | { kind: 'spiel_reihenfolge' }
+  | { kind: 'spiel_luecken_fuellen'; vocab: { es: string; de: string }[] }
 
 const BACK_BTN =
   'text-muted text-sm tap-scale self-start mb-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded'
@@ -279,7 +281,7 @@ export default function Lektion() {
       recordVocabSeen(vocab)
       if (mode) addCompletedModeToday(mode)
       incrementLektionenInEtappe()
-      setPageState({ kind: 'spiel_reihenfolge' })
+      setPageState({ kind: 'spiel_luecken_fuellen', vocab })
       return
     }
 
@@ -337,6 +339,19 @@ export default function Lektion() {
     return (
       <div className={PAGE_WRAP}>
         <SpielReihenfolge
+          etappe={user?.etappe ?? 1}
+          onFinish={() => setAbschluss(true)}
+        />
+      </div>
+    )
+  }
+
+  if (pageState.kind === 'spiel_luecken_fuellen') {
+    const user = getUser()
+    return (
+      <div className={PAGE_WRAP}>
+        <SpielLueckenFuellen
+          vocab={pageState.vocab}
           etappe={user?.etappe ?? 1}
           onFinish={() => setAbschluss(true)}
         />

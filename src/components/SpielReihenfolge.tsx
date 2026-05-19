@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { recordVocabAnswer } from '../lib/vocabTracking'
 import Button from './Button'
 
+
 interface Satz {
   satz: string
   uebersetzung: string
@@ -65,13 +66,39 @@ export default function SpielReihenfolge({ etappe, onFinish }: Props) {
     )
   }
 
+  useEffect(() => {
+    if (!done) return
+    const t = setTimeout(onFinish, 8000)
+    return () => clearTimeout(t)
+  }, [done, onFinish])
+
+  function handleNochmal() {
+    setIndex(0)
+    setCorrect(0)
+    setDone(false)
+  }
+
   if (done) {
     return (
-      <div className="fade-in flex flex-col items-center justify-center min-h-[60vh] gap-4">
+      <div className="fade-in flex flex-col items-center justify-center min-h-[60vh] gap-4 px-4">
         <p className="font-serif text-[26px] font-semibold text-text text-center">Schön gespielt.</p>
         <p className="text-[15px] text-muted text-center">
           {correct} von {saetze.length} Sätzen richtig geordnet.
         </p>
+        <div className="flex flex-col gap-3 w-full max-w-[320px] mt-2">
+          <button
+            onClick={handleNochmal}
+            className="w-full py-4 rounded-[16px] bg-accent text-white text-[15px] font-semibold tap-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            Nochmal
+          </button>
+          <button
+            onClick={onFinish}
+            className="w-full py-4 rounded-[16px] border border-accent text-accent text-[15px] font-semibold tap-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            Zurück
+          </button>
+        </div>
       </div>
     )
   }
@@ -88,7 +115,6 @@ export default function SpielReihenfolge({ etappe, onFinish }: Props) {
         if (wasCorrect) setCorrect(c => c + 1)
         if (index + 1 >= saetze.length) {
           setDone(true)
-          setTimeout(() => onFinish(), 1200)
         } else {
           setIndex(i => i + 1)
         }

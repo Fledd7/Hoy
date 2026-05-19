@@ -58,8 +58,6 @@ async function callGemini(prompt: string, apiKey: string): Promise<unknown> {
   }
 
   if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    console.error(`[hoy/lektion] gemini http ${res.status}:`, body.slice(0, 300))
     throw new Error(`gemini_${res.status}`)
   }
 
@@ -67,14 +65,12 @@ async function callGemini(prompt: string, apiKey: string): Promise<unknown> {
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text
 
   if (!text) {
-    console.error('[hoy/lektion] gemini empty response:', JSON.stringify(data).slice(0, 300))
     throw new Error('gemini_empty_response')
   }
 
   try {
     return JSON.parse(extractJson(text)) as unknown
-  } catch (err) {
-    console.error('[hoy/lektion] json parse failed:', text.slice(0, 300), err)
+  } catch {
     throw new Error('gemini_json_parse')
   }
 }
@@ -86,7 +82,6 @@ export default async function handler(request: Request): Promise<Response> {
 
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
-    console.error('[hoy/lektion] GEMINI_API_KEY not set')
     return new Response(JSON.stringify({ error: 'fallback' }), { status: 500 })
   }
 
@@ -110,7 +105,6 @@ export default async function handler(request: Request): Promise<Response> {
       })
     } catch (err) {
       lastErr = err
-      console.error(`[hoy/lektion] attempt ${attempt + 1} failed:`, err)
     }
   }
 
