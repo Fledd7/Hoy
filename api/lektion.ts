@@ -7,7 +7,14 @@ declare const process: { env: Record<string, string | undefined> }
 
 interface RequestBody {
   modus: 'muede' | 'okay' | 'fit' | 'erzaehl'
-  profil: { niveau: string; themen: string[]; why: string }
+  profil: {
+    niveau: string
+    themen: string[]
+    why: string
+    etappenName?: string
+    etappenBeschreibung?: string
+    etappenNiveau?: string
+  }
   userInput?: string
 }
 

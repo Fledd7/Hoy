@@ -1,4 +1,5 @@
 import type { UserData, LessonHistoryItem, EnergyMode } from './types';
+import { etappeForNiveau } from './etappen';
 
 const USER_KEY = 'hoy_user';
 const LESSON_CACHE_KEY = 'hoy_lessonCache';
@@ -151,6 +152,35 @@ export function addCompletedModeToday(mode: EnergyMode): void {
   } catch {
     // storage unavailable
   }
+}
+
+// ─── Etappen ─────────────────────────────────────────────────────────────────
+
+// Silently migrates old users who lack etappe/lektionenInEtappe fields.
+export function ensureEtappenMigration(): void {
+  const user = getUser();
+  if (!user || user.etappe !== undefined) return;
+  saveUser({ ...user, etappe: etappeForNiveau(user.niveau), lektionenInEtappe: 0 });
+}
+
+// Increment counter, advance etappe if threshold reached.
+// Returns whether the etappe advanced and which etappe is now active.
+export function incrementLektionenInEtappe(): { advanced: boolean; newEtappe: 1 | 2 | 3 | 4 | 5 } {
+  const user = getUser();
+  if (!user) return { advanced: false, newEtappe: 1 };
+
+  const currentEtappe: 1 | 2 | 3 | 4 | 5 = user.etappe ?? etappeForNiveau(user.niveau);
+  const lektionen = (user.lektionenInEtappe ?? 0) + 1;
+
+  const THRESHOLD = 11;
+  const advanced = lektionen >= THRESHOLD && currentEtappe < 5;
+  const newEtappe: 1 | 2 | 3 | 4 | 5 = advanced
+    ? ((currentEtappe + 1) as 1 | 2 | 3 | 4 | 5)
+    : currentEtappe;
+  const newLektionen = advanced ? 0 : lektionen;
+
+  saveUser({ ...user, etappe: newEtappe, lektionenInEtappe: newLektionen });
+  return { advanced, newEtappe };
 }
 
 // ─── Lesson History ───────────────────────────────────────────────────────────

@@ -151,6 +151,9 @@ export interface LessonProfil {
   niveau: string
   themen: string[]
   why: string
+  etappenName?: string
+  etappenBeschreibung?: string
+  etappenNiveau?: string
 }
 
 export async function fetchLektion(

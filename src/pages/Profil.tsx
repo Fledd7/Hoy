@@ -1,16 +1,18 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Check } from 'lucide-react'
 import Button from '../components/Button'
 import ThemeChip from '../components/ThemeChip'
-import { getUser, saveUser, resetAll, getSeenVocab } from '../lib/storage'
+import { getUser, saveUser, resetAll, getSeenVocab, ensureEtappenMigration } from '../lib/storage'
 import { THEMEN, REQUIRED_THEMEN_COUNT } from '../lib/config'
+import { ETAPPEN } from '../lib/etappen'
 import type { UserData } from '../lib/types'
 
 const NIVEAU_LABELS: Record<UserData['niveau'], string> = {
-  anfaenger: 'Anfänger',
-  wiedereinsteiger_schule: 'Wiedereinsteiger – Schule liegt zurück',
-  wiedereinsteiger_a2: 'Wiedereinsteiger – A2',
-  wiedereinsteiger_b1: 'Wiedereinsteiger – B1+',
+  anfaenger: 'Ich fange ganz neu an',
+  wiedereinsteiger_schule: 'Schule liegt lange zurück',
+  wiedereinsteiger_a2: 'Ich verstehe einfache Sätze',
+  wiedereinsteiger_b1: 'Ich kann mich unterhalten',
 }
 
 function VocabChip({ es, de }: { es: string; de: string }) {
@@ -28,17 +30,21 @@ function VocabChip({ es, de }: { es: string; de: string }) {
 
 export default function Profil() {
   const navigate = useNavigate()
+  ensureEtappenMigration()
   const user = getUser()
   const seenVocab = getSeenVocab()
 
   const [themen, setThemen] = useState<string[]>(user?.themen ?? [])
   const [why, setWhy] = useState(user?.why ?? '')
   const [saved, setSaved] = useState(false)
+  const [expandedEtappe, setExpandedEtappe] = useState<number | null>(user?.etappe ?? null)
 
   if (!user) {
     navigate('/onboarding', { replace: true })
     return null
   }
+
+  const currentEtappe = user.etappe ?? 1
 
   function toggleThema(thema: string) {
     setThemen((prev) =>
@@ -75,6 +81,115 @@ export default function Profil() {
       </button>
       <h1 className="font-serif text-[32px] font-semibold text-text mb-8 leading-tight">Profil</h1>
 
+      {/* ─── Etappen-Journey ─────────────────────────────────────────────── */}
+      <section className="mb-8">
+        <h2 className="font-serif text-[24px] font-semibold text-text leading-tight">Deine Reise</h2>
+        <p className="text-[14px] text-muted mt-1 mb-4">Wo du gerade unterwegs bist.</p>
+
+        <div className="flex flex-col gap-2">
+          {ETAPPEN.map((etappe) => {
+            const isPast = etappe.nummer < currentEtappe
+            const isCurrent = etappe.nummer === currentEtappe
+            const isFuture = etappe.nummer > currentEtappe
+            const isExpanded = expandedEtappe === etappe.nummer && !isFuture
+
+            function handleEtappeClick() {
+              if (isFuture) return
+              setExpandedEtappe(isExpanded ? null : etappe.nummer)
+            }
+
+            return (
+              <div
+                key={etappe.nummer}
+                className="bg-white rounded-[16px] px-4 py-3 transition-opacity"
+                style={{
+                  border: isCurrent
+                    ? '1px solid rgba(194,85,61,0.25)'
+                    : '1px solid rgba(224,219,214,0.8)',
+                  boxShadow: isCurrent
+                    ? '0 0 0 2px rgba(194,85,61,0.06), 0 2px 8px rgba(26,26,26,0.04)'
+                    : '0 1px 4px rgba(26,26,26,0.04)',
+                  opacity: isFuture ? 0.6 : 1,
+                }}
+              >
+                <button
+                  onClick={handleEtappeClick}
+                  disabled={isFuture}
+                  className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-[8px]"
+                >
+                  <div className="flex items-center gap-3">
+                    {/* Nummer-Kreis */}
+                    <span
+                      className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-[13px] font-semibold"
+                      style={{
+                        backgroundColor: isCurrent
+                          ? '#C2553D'
+                          : isPast
+                          ? '#1A1A1A'
+                          : 'transparent',
+                        border: isFuture ? '1.5px solid #C0BAB4' : 'none',
+                        color: isFuture ? '#9B9B9B' : 'white',
+                      }}
+                    >
+                      {etappe.nummer}
+                    </span>
+
+                    {/* Name + Untertitel */}
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-[15px] font-semibold text-text leading-tight">
+                        {etappe.name}
+                      </span>
+                      <span className="block text-[12px] text-muted italic mt-0.5">
+                        {etappe.untertitel}
+                      </span>
+                    </span>
+
+                    {/* Status */}
+                    <span className="flex-shrink-0 flex items-center gap-1">
+                      {isCurrent && (
+                        <>
+                          <span className="w-2 h-2 rounded-full bg-accent" />
+                          <span className="text-[11px] text-accent font-medium">Hier bist du</span>
+                        </>
+                      )}
+                      {isPast && (
+                        <Check size={16} className="text-[#1A1A1A]" />
+                      )}
+                    </span>
+                  </div>
+                </button>
+
+                {/* Aufgeklappte Themen */}
+                {isExpanded && (
+                  <div className="mt-3 pt-3 border-t border-[#F0EDE8] fade-in">
+                    <p className="text-[11px] text-muted mb-2" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Themen dieser Etappe
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {etappe.themen.map(t => (
+                        <span
+                          key={t}
+                          className="text-[12px] text-text bg-[#F5F1EB] rounded-full px-3 py-1"
+                        >
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {currentEtappe === 5 && (
+          <p className="text-[13px] text-muted mt-3 text-center">
+            Du bist in der letzten Etappe angekommen. Hier kannst du frei weiterlernen.
+          </p>
+        )}
+      </section>
+
+      {/* ─── Niveau ──────────────────────────────────────────────────────── */}
       <section className="mb-8">
         <h2 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3">Niveau</h2>
         <p className="text-base text-text bg-white border border-[#E0DDD8] rounded-card px-4 py-3">
@@ -150,7 +265,7 @@ export default function Profil() {
         >
           Alle Daten zurücksetzen
         </Button>
-        <p className="text-center text-[12px] text-[#9B9B9B] mt-8">Hoy v0.7.1</p>
+        <p className="text-center text-[12px] text-[#9B9B9B] mt-8">Hoy v0.8</p>
       </div>
     </div>
   )

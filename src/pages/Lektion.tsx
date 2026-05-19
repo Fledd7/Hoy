@@ -2,8 +2,17 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import LessonView from '../components/LessonView'
 import Button from '../components/Button'
-import { getUser, addSeenVocab, addCompletedModeToday, getCompletedModesToday } from '../lib/storage'
+import {
+  getUser,
+  addSeenVocab,
+  addCompletedModeToday,
+  getCompletedModesToday,
+  incrementLektionenInEtappe,
+  ensureEtappenMigration,
+} from '../lib/storage'
 import { fetchLektion, clearModeCache } from '../lib/api'
+import { ETAPPEN } from '../lib/etappen'
+import type { Etappe } from '../lib/etappen'
 import type { EnergyMode, Lesson } from '../lib/types'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -16,6 +25,8 @@ const ABSCHLUSS_ES = [
   'Nos vemos.',
 ]
 
+const UEBERGANG_SAETZE = ['Sigues adelante.', 'Buen camino.', 'Adelante.']
+
 function extractVocab(lesson: Lesson): { es: string; de: string }[] {
   if (lesson.mode === 'muede') return lesson.vocab
   if (lesson.mode === 'okay') return []
@@ -26,12 +37,99 @@ function extractKeyword(lesson: Lesson): { es: string; de: string } | null {
   if (lesson.mode === 'muede') return lesson.vocab[0] ?? null
   if (lesson.mode === 'fit')   return lesson.vocab[0] ?? null
   if (lesson.mode === 'erzaehl') return lesson.vocab[0] ?? null
-  // okay: find first non-trivial word from text
   const stop = new Set(['el','la','los','las','un','una','en','de','a','y','que',
     'se','su','con','por','para','es','ha','al','del','su','lo'])
   const words = lesson.text.split(/[\s,.:;!?'"()]+/)
   const word = words.find(w => w.length > 4 && !stop.has(w.toLowerCase()))
   return word ? { es: word, de: '' } : null
+}
+
+// ─── Etappen-Übergangs-Screen ─────────────────────────────────────────────────
+
+function EtappenUebergangScreen({
+  von,
+  zu,
+  onWeiter,
+}: {
+  von: Etappe
+  zu: Etappe
+  onWeiter: () => void
+}) {
+  const [phase, setPhase] = useState<0 | 1 | 2>(0)
+  const [satz] = useState(() => UEBERGANG_SAETZE[Math.floor(Math.random() * UEBERGANG_SAETZE.length)])
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setPhase(1), 1500)
+    const t2 = setTimeout(() => setPhase(2), 3000)
+    const t3 = setTimeout(() => onWeiter(), 8000)
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
+  }, [onWeiter])
+
+  return (
+    <div className="flex flex-col min-h-screen bg-[#FAF7F2] items-center justify-center px-8">
+      <p
+        className="text-[11px] text-muted mb-10"
+        style={{ textTransform: 'uppercase', letterSpacing: '0.1em' }}
+      >
+        Du gehst weiter.
+      </p>
+
+      <div className="w-full max-w-[340px] flex flex-col gap-4">
+        {/* Alte Etappe – fades up */}
+        <div
+          style={{
+            opacity: phase >= 1 ? 0 : 1,
+            transform: phase >= 1 ? 'translateY(-16px)' : 'translateY(0)',
+            transition: 'opacity 500ms ease-out, transform 500ms ease-out',
+            height: phase >= 2 ? 0 : 'auto',
+            overflow: 'hidden',
+          }}
+        >
+          <div className="bg-white border border-[#E0DDD8] rounded-[16px] px-5 py-4">
+            <p className="text-[11px] text-muted mb-1" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              War unterwegs in
+            </p>
+            <p className="font-serif text-[20px] font-semibold text-text leading-tight">{von.name}</p>
+            <p className="text-[13px] text-muted italic mt-0.5">{von.untertitel}</p>
+          </div>
+        </div>
+
+        {/* Neue Etappe – fades in */}
+        <div
+          style={{
+            opacity: phase >= 1 ? 1 : 0,
+            transform: phase >= 2 ? 'translateY(0) scale(1.01)' : 'translateY(8px) scale(0.98)',
+            transition: 'opacity 500ms ease-out, transform 500ms ease-out',
+          }}
+        >
+          <div
+            className="bg-white rounded-[16px] px-5 py-4"
+            style={{
+              border: '1px solid rgba(194,85,61,0.3)',
+              boxShadow: '0 0 0 3px rgba(194,85,61,0.08), 0 4px 16px rgba(26,26,26,0.06)',
+            }}
+          >
+            <p className="text-[11px] text-accent font-semibold mb-1" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Neue Etappe
+            </p>
+            <p className="font-serif text-[22px] font-semibold text-text leading-tight">{zu.name}</p>
+            <p className="text-[13px] text-muted italic mt-0.5">{zu.untertitel}</p>
+          </div>
+        </div>
+      </div>
+
+      <p className="text-[15px] text-muted italic mt-10">{satz}</p>
+
+      {phase >= 1 && (
+        <button
+          onClick={onWeiter}
+          className="fade-in mt-8 w-full max-w-[340px] bg-accent text-white rounded-[16px] py-4 text-[16px] font-semibold tap-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+        >
+          Bereit für {zu.name}
+        </button>
+      )}
+    </div>
+  )
 }
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -56,6 +154,7 @@ export default function Lektion() {
   const [abschluss, setAbschluss] = useState(false)
   const [fadingOut, setFadingOut] = useState(false)
   const [erzaehlInput, setErzaehlInput] = useState('')
+  const [etappenUebergang, setEtappenUebergang] = useState<{ von: Etappe; zu: Etappe } | null>(null)
 
   const rawMode = searchParams.get('mode')
   const mode: EnergyMode | null =
@@ -67,7 +166,6 @@ export default function Lektion() {
     mode === 'erzaehl' ? { kind: 'erzaehl_input' } : { kind: 'loading' },
   )
 
-  // Stable random sign-off picked once on mount
   const [signOff] = useState(
     () => ABSCHLUSS_ES[Math.floor(Math.random() * ABSCHLUSS_ES.length)],
   )
@@ -75,12 +173,25 @@ export default function Lektion() {
   const loadLektion = useCallback(
     async (m: EnergyMode, userInput?: string) => {
       setPageState({ kind: 'loading' })
+      ensureEtappenMigration()
       const user = getUser()
       if (!user) { navigate('/onboarding', { replace: true }); return }
+
+      const etappe = user.etappe !== undefined
+        ? ETAPPEN.find(e => e.nummer === user.etappe)
+        : undefined
+
       try {
         const lesson = await fetchLektion(
           m,
-          { niveau: user.niveau, themen: user.themen, why: user.why },
+          {
+            niveau: user.niveau,
+            themen: user.themen,
+            why: user.why,
+            etappenName: etappe?.name,
+            etappenBeschreibung: etappe?.beschreibung,
+            etappenNiveau: etappe?.niveau,
+          },
           userInput,
         )
         setPageState({ kind: 'ready', lesson })
@@ -93,7 +204,6 @@ export default function Lektion() {
 
   useEffect(() => {
     if (!mode || mode === 'erzaehl') return
-    // If this mode was already completed today, bypass the cache for a fresh lesson
     if (getCompletedModesToday().has(mode)) {
       clearModeCache(mode)
     }
@@ -108,13 +218,36 @@ export default function Lektion() {
     return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [abschluss, navigate])
 
+  const handleWeiter = useCallback(() => {
+    navigate('/heute', { replace: true })
+  }, [navigate])
+
   const handleFinish = useCallback(() => {
     if (pageState.kind === 'ready') {
       addSeenVocab(extractVocab(pageState.lesson))
     }
     if (mode) addCompletedModeToday(mode)
-    setAbschluss(true)
+
+    const { advanced, newEtappe } = incrementLektionenInEtappe()
+    if (advanced) {
+      const von = ETAPPEN[newEtappe - 2]
+      const zu = ETAPPEN[newEtappe - 1]
+      setEtappenUebergang({ von, zu })
+    } else {
+      setAbschluss(true)
+    }
   }, [pageState, mode])
+
+  // ─── Etappen-Übergang ─────────────────────────────────────────────────────
+  if (etappenUebergang) {
+    return (
+      <EtappenUebergangScreen
+        von={etappenUebergang.von}
+        zu={etappenUebergang.zu}
+        onWeiter={handleWeiter}
+      />
+    )
+  }
 
   // ─── invalid mode ──────────────────────────────────────────────────────────
   if (!mode) {

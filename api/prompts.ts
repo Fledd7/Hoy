@@ -3,6 +3,9 @@ export interface PromptContext {
   themen: string[]
   why: string
   userInput?: string
+  etappenName?: string
+  etappenBeschreibung?: string
+  etappenNiveau?: string
 }
 
 const NIVEAU_MAP: Record<string, string> = {
@@ -20,18 +23,27 @@ const SCHEMAS: Record<string, string> = {
 }
 
 export function buildPrompt(modus: string, ctx: PromptContext): string {
-  const niveauLabel = NIVEAU_MAP[ctx.niveau] ?? ctx.niveau
   const themenStr = ctx.themen.join(', ')
   const whyStr = ctx.why || 'nicht angegeben'
   const schema = SCHEMAS[modus] ?? ''
 
-  const system =
-    `Du erstellst Spanisch-Lektionen für deutschsprachige Lernende. ` +
-    `Sprich natürliches, modernes Castellano. ` +
-    `Niveau anpassen an: ${niveauLabel}. ` +
-    `Themen einbeziehen: ${themenStr}. ` +
-    `Lernkontext: ${whyStr}. ` +
-    `Antworte AUSSCHLIESSLICH mit validem JSON ohne Markdown-Blöcke.`
+  const system = ctx.etappenName
+    ? `Du erstellst Spanisch-Lektionen für deutschsprachige Lernende.\n` +
+      `Sprich natürliches, modernes Castellano.\n` +
+      `Aktuelle Lernetappe: ${ctx.etappenName} – ${ctx.etappenBeschreibung ?? ''}.\n` +
+      `Sprachniveau: ${ctx.etappenNiveau ?? ''}.\n` +
+      `Lieblings-Themen des Nutzers: ${themenStr}.\n` +
+      `Lernkontext: ${whyStr}.\n\n` +
+      `Wichtig: Die Lektion muss zur aktuellen Etappe passen. Verwende Strukturen und Vokabular, ` +
+      `die zum Niveau der Etappe gehören. Etappen-Themen können einfließen, aber auch die ` +
+      `Lieblings-Themen des Nutzers.\n` +
+      `Antworte AUSSCHLIESSLICH mit validem JSON ohne Markdown-Blöcke.`
+    : `Du erstellst Spanisch-Lektionen für deutschsprachige Lernende. ` +
+      `Sprich natürliches, modernes Castellano. ` +
+      `Niveau anpassen an: ${NIVEAU_MAP[ctx.niveau] ?? ctx.niveau}. ` +
+      `Themen einbeziehen: ${themenStr}. ` +
+      `Lernkontext: ${whyStr}. ` +
+      `Antworte AUSSCHLIESSLICH mit validem JSON ohne Markdown-Blöcke.`
 
   const modusPrompts: Record<string, string> = {
     muede:

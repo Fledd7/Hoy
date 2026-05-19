@@ -5,6 +5,7 @@ import Button from '../components/Button'
 import ThemeChip from '../components/ThemeChip'
 import { saveUser } from '../lib/storage'
 import { THEMEN, REQUIRED_THEMEN_COUNT } from '../lib/config'
+import { etappeForNiveau } from '../lib/etappen'
 import type { UserData } from '../lib/types'
 
 type Step = 'welcome' | 'niveau' | 'wiedereinsteiger' | 'themen' | 'why' | 'fertig'
@@ -49,6 +50,8 @@ export default function Onboarding() {
       why,
       onboardingDone: true,
       letztesOeffnen: new Date().toISOString(),
+      etappe: etappeForNiveau(niveau),
+      lektionenInEtappe: 0,
     })
     navigate('/heute', { replace: true })
   }
@@ -77,10 +80,10 @@ export default function Onboarding() {
       >
         <div className="flex flex-col gap-3 mt-2">
           <Button variant="secondary" fullWidth onClick={() => handleNiveauBase('anfaenger')}>
-            Ich bin Anfänger
+            Ich fange ganz neu an
           </Button>
           <Button variant="secondary" fullWidth onClick={() => handleNiveauBase('wiedereinsteiger')}>
-            Ich war schon mal dabei
+            Ich kann schon etwas Spanisch
           </Button>
         </div>
       </OnboardingStep>
@@ -98,10 +101,10 @@ export default function Onboarding() {
             Schule liegt lange zurück
           </Button>
           <Button variant="secondary" fullWidth onClick={() => handleWiedereinsteiger('wiedereinsteiger_a2')}>
-            Ich kann mich verständigen (A2)
+            Ich verstehe einfache Sätze
           </Button>
           <Button variant="secondary" fullWidth onClick={() => handleWiedereinsteiger('wiedereinsteiger_b1')}>
-            Ich bin ganz okay (B1+)
+            Ich kann mich unterhalten
           </Button>
         </div>
       </OnboardingStep>
