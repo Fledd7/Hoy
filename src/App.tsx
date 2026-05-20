@@ -5,6 +5,7 @@ import Heute from './pages/Heute'
 import Lektion from './pages/Lektion'
 import Profil from './pages/Profil'
 import Wiederholen from './pages/Wiederholen'
+import Check from './pages/Check'
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/lektion" element={<Lektion />} />
         <Route path="/profil" element={<Profil />} />
         <Route path="/wiederholen" element={<Wiederholen />} />
+        <Route path="/check" element={<Check />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
