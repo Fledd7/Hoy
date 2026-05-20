@@ -106,6 +106,6 @@ export default async function handler(request: Request): Promise<Response> {
     }
   }
 
-  void lastErr
-  return new Response(JSON.stringify({ error: 'fallback' }), { status: 500 })
+  const reason = lastErr instanceof Error ? lastErr.message : 'unknown'
+  return new Response(JSON.stringify({ error: 'fallback', reason }), { status: 500 })
 }

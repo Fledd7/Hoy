@@ -161,6 +161,7 @@ export default function Lektion() {
   const [erzaehlInput, setErzaehlInput] = useState('')
   const [etappenUebergang, setEtappenUebergang] = useState<{ von: Etappe; zu: Etappe } | null>(null)
   const [reviewableCount, setReviewableCount] = useState(0)
+  const [retrying, setRetrying] = useState(false)
 
   const rawMode = searchParams.get('mode')
   const mode: EnergyMode | null =
@@ -178,6 +179,7 @@ export default function Lektion() {
 
   const loadLektion = useCallback(
     async (m: EnergyMode, userInput?: string) => {
+      setRetrying(false)
       setPageState({ kind: 'loading' })
       ensureEtappenMigration()
       const user = getUser()
@@ -199,9 +201,12 @@ export default function Lektion() {
             etappenNiveau: etappe?.niveau,
           },
           userInput,
+          () => setRetrying(true),
         )
+        setRetrying(false)
         setPageState({ kind: 'ready', lesson })
       } catch (err) {
+        setRetrying(false)
         setPageState({ kind: 'error', reason: err instanceof Error ? err.message : 'unknown' })
       }
     },
@@ -448,6 +453,9 @@ export default function Lektion() {
           <div className="h-5 bg-[#E5E2DD] rounded animate-pulse w-full" />
           <div className="h-5 bg-[#E5E2DD] rounded animate-pulse w-2/3" />
         </div>
+        {retrying && (
+          <p className="text-[14px] text-[#6B6B6B] text-center mt-6">Einen Moment noch…</p>
+        )}
       </div>
     )
   }
