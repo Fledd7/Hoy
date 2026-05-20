@@ -105,36 +105,47 @@ function extractSchluesselwort(raw: WithSchluesselwort): VocabItem | undefined {
 }
 
 function mapToLesson(modus: EnergyMode, raw: unknown): Lesson {
+  if (typeof raw !== 'object' || raw === null) throw new Error('invalid_response_not_object')
+
   if (modus === 'muede') {
     const d = raw as MuedeResponse
-    if (!d.text_es || !d.text_de || !Array.isArray(d.vokabeln)) throw new Error('invalid muede')
-    return { mode: 'muede', text: d.text_es, translation: d.text_de, vocab: d.vokabeln, schluesselwort: extractSchluesselwort(d) }
+    if (!d.text_es || !d.text_de) throw new Error('invalid_muede_missing_text')
+    const vocab = Array.isArray(d.vokabeln) ? d.vokabeln : []
+    return { mode: 'muede', text: d.text_es, translation: d.text_de, vocab, schluesselwort: extractSchluesselwort(d) }
   }
   if (modus === 'okay') {
     const d = raw as OkayResponse
-    if (!d.text_es || !d.text_de || !Array.isArray(d.fragen)) throw new Error('invalid okay')
+    if (!d.text_es || !d.text_de) throw new Error('invalid_okay_missing_text')
+    if (!Array.isArray(d.fragen) || d.fragen.length === 0) throw new Error('invalid_okay_missing_fragen')
     return {
       mode: 'okay',
       text: d.text_es,
       translation: d.text_de,
-      questions: d.fragen.map(f => ({ question: f.frage, options: f.antworten, correctIndex: f.richtig })),
+      // Gemini may return `richtig` as a string — coerce to number defensively
+      questions: d.fragen.map(f => ({
+        question: f.frage,
+        options: Array.isArray(f.antworten) ? f.antworten : [],
+        correctIndex: Number(f.richtig) || 0,
+      })),
       schluesselwort: extractSchluesselwort(d),
     }
   }
   if (modus === 'fit') {
     const d = raw as FitResponse
-    if (!Array.isArray(d.dialog) || !Array.isArray(d.vokabeln)) throw new Error('invalid fit')
+    if (!Array.isArray(d.dialog) || d.dialog.length === 0) throw new Error('invalid_fit_missing_dialog')
+    const vocab = Array.isArray(d.vokabeln) ? d.vokabeln : []
     return {
       mode: 'fit',
       dialog: d.dialog.map(l => ({ speaker: l.sprecher, es: l.es, de: l.de })),
-      vocab: d.vokabeln,
+      vocab,
       schluesselwort: extractSchluesselwort(d),
     }
   }
   // erzaehl
   const d = raw as ErzaehlResponse
-  if (!Array.isArray(d.saetze) || !Array.isArray(d.vokabeln)) throw new Error('invalid erzaehl')
-  return { mode: 'erzaehl', saetze: d.saetze, vocab: d.vokabeln, schluesselwort: extractSchluesselwort(d) }
+  if (!Array.isArray(d.saetze) || d.saetze.length === 0) throw new Error('invalid_erzaehl_missing_saetze')
+  const vocab = Array.isArray(d.vokabeln) ? d.vokabeln : []
+  return { mode: 'erzaehl', saetze: d.saetze, vocab, schluesselwort: extractSchluesselwort(d) }
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -193,7 +204,8 @@ export async function fetchLektion(
   }
 
   if (typeof raw === 'object' && raw !== null && 'error' in raw) {
-    throw new Error('fallback')
+    const r = raw as { error: string; reason?: string }
+    throw new Error(r.reason ?? r.error)
   }
 
   if (!res.ok) throw new Error(`api_error_${res.status}`)
