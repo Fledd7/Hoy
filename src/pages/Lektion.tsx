@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import LessonView from '../components/LessonView'
+import LoadingWords from '../components/LoadingWords'
 import SpielBildMatching from '../components/SpielBildMatching'
 import SpielWortPaare from '../components/SpielWortPaare'
 import SpielReihenfolge from '../components/SpielReihenfolge'
@@ -161,7 +162,6 @@ export default function Lektion() {
   const [erzaehlInput, setErzaehlInput] = useState('')
   const [etappenUebergang, setEtappenUebergang] = useState<{ von: Etappe; zu: Etappe } | null>(null)
   const [reviewableCount, setReviewableCount] = useState(0)
-  const [retrying, setRetrying] = useState(false)
 
   const rawMode = searchParams.get('mode')
   const mode: EnergyMode | null =
@@ -179,7 +179,6 @@ export default function Lektion() {
 
   const loadLektion = useCallback(
     async (m: EnergyMode, userInput?: string) => {
-      setRetrying(false)
       setPageState({ kind: 'loading' })
       ensureEtappenMigration()
       const user = getUser()
@@ -201,12 +200,9 @@ export default function Lektion() {
             etappenNiveau: etappe?.niveau,
           },
           userInput,
-          () => setRetrying(true),
         )
-        setRetrying(false)
         setPageState({ kind: 'ready', lesson })
       } catch (err) {
-        setRetrying(false)
         setPageState({ kind: 'error', reason: err instanceof Error ? err.message : 'unknown' })
       }
     },
@@ -443,19 +439,12 @@ export default function Lektion() {
     )
   }
 
-  // ─── loading skeleton ─────────────────────────────────────────────────────
+  // ─── loading ──────────────────────────────────────────────────────────────
   if (pageState.kind === 'loading') {
     return (
       <div className={PAGE_WRAP}>
         {backBtn}
-        <div className="flex flex-col gap-4 pt-2">
-          <div className="h-5 bg-[#E5E2DD] rounded animate-pulse w-4/5" />
-          <div className="h-5 bg-[#E5E2DD] rounded animate-pulse w-full" />
-          <div className="h-5 bg-[#E5E2DD] rounded animate-pulse w-2/3" />
-        </div>
-        {retrying && (
-          <p className="text-[14px] text-[#6B6B6B] text-center mt-6">Einen Moment noch…</p>
-        )}
+        <LoadingWords />
       </div>
     )
   }

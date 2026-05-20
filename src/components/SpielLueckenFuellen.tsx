@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { recordVocabAnswer } from '../lib/vocabTracking'
 import { isCloseMatch } from '../lib/stringUtils'
 import { fetchLuecken } from '../lib/api'
 import type { LueckeItem } from '../lib/api'
 import Button from './Button'
+import LoadingWords from './LoadingWords'
 
 interface VocabPair {
   es: string
@@ -17,27 +19,27 @@ interface Props {
 }
 
 export default function SpielLueckenFuellen({ vocab, etappe, onFinish }: Props) {
+  const navigate = useNavigate()
   const [luecken, setLuecken] = useState<LueckeItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [retrying, setRetrying] = useState(false)
   const [error, setError] = useState(false)
   const [index, setIndex] = useState(0)
   const [correct, setCorrect] = useState(0)
   const [done, setDone] = useState(false)
+  const [fetchCount, setFetchCount] = useState(0)
 
   const usedVocab = vocab.slice(0, 5)
 
   useEffect(() => {
     let mounted = true
+    setLoading(true)
+    setError(false)
     const load = async () => {
       try {
-        const data = await fetchLuecken(usedVocab, etappe, () => {
-          if (mounted) setRetrying(true)
-        })
+        const data = await fetchLuecken(usedVocab, etappe, undefined, fetchCount > 0)
         if (mounted) {
           setLuecken(data.saetze ?? [])
           setLoading(false)
-          setRetrying(false)
         }
       } catch {
         if (mounted) { setError(true); setLoading(false) }
@@ -46,31 +48,10 @@ export default function SpielLueckenFuellen({ vocab, etappe, onFinish }: Props) 
     void load()
     return () => { mounted = false }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const handleNochmal = useCallback(() => {
-    setIndex(0)
-    setCorrect(0)
-    setDone(false)
-  }, [])
-
-  useEffect(() => {
-    if (!done) return
-    const t = setTimeout(onFinish, 8000)
-    return () => clearTimeout(t)
-  }, [done, onFinish])
+  }, [fetchCount])
 
   if (loading) {
-    return (
-      <div className="flex flex-col gap-4 pt-2">
-        <div className="h-5 bg-[#E5E2DD] rounded animate-pulse w-4/5" />
-        <div className="h-5 bg-[#E5E2DD] rounded animate-pulse w-full" />
-        <div className="h-5 bg-[#E5E2DD] rounded animate-pulse w-2/3" />
-        {retrying && (
-          <p className="text-[14px] text-[#6B6B6B] text-center mt-2">Einen Moment noch…</p>
-        )}
-      </div>
-    )
+    return <LoadingWords />
   }
 
   if (error || luecken.length === 0) {
@@ -91,16 +72,21 @@ export default function SpielLueckenFuellen({ vocab, etappe, onFinish }: Props) 
         </p>
         <div className="flex flex-col gap-3 w-full max-w-[320px] mt-2">
           <button
-            onClick={handleNochmal}
+            onClick={() => {
+              setIndex(0)
+              setCorrect(0)
+              setDone(false)
+              setFetchCount(c => c + 1)
+            }}
             className="w-full py-4 rounded-[16px] bg-accent text-white text-[15px] font-semibold tap-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            Nochmal
+            Noch eine Runde
           </button>
           <button
-            onClick={onFinish}
+            onClick={() => navigate('/wiederholen')}
             className="w-full py-4 rounded-[16px] border border-accent text-accent text-[15px] font-semibold tap-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            Zurück
+            Zurück zur Übersicht
           </button>
         </div>
       </div>
