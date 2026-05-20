@@ -4,7 +4,7 @@ import OnboardingStep from '../components/OnboardingStep'
 import Button from '../components/Button'
 import ThemeChip from '../components/ThemeChip'
 import { saveUser } from '../lib/storage'
-import { THEMEN, REQUIRED_THEMEN_COUNT } from '../lib/config'
+import { THEMEN, MIN_THEMEN_COUNT, MAX_THEMEN_COUNT } from '../lib/config'
 import { etappeForNiveau } from '../lib/etappen'
 import type { UserData } from '../lib/types'
 
@@ -36,7 +36,7 @@ export default function Onboarding() {
     setThemen((prev) =>
       prev.includes(thema)
         ? prev.filter((t) => t !== thema)
-        : prev.length < REQUIRED_THEMEN_COUNT
+        : prev.length < MAX_THEMEN_COUNT
         ? [...prev, thema]
         : prev
     )
@@ -101,7 +101,7 @@ export default function Onboarding() {
       >
         <div className="flex flex-col gap-3 mt-2">
           <Button variant="secondary" fullWidth onClick={() => handleWiedereinsteiger('wiedereinsteiger_schule')}>
-            Schule liegt lange zurück
+            Etwas Schulspanisch ist da
           </Button>
           <Button variant="secondary" fullWidth onClick={() => handleWiedereinsteiger('wiedereinsteiger_a2')}>
             Ich verstehe einfache Sätze
@@ -115,15 +115,19 @@ export default function Onboarding() {
   }
 
   if (step === 'themen') {
-    const remaining = REQUIRED_THEMEN_COUNT - themen.length
+    const count = themen.length
+    const subtitle =
+      count === 0
+        ? 'Wähle mindestens 2 Themen'
+        : count === 1
+        ? 'Noch mindestens 1 Thema'
+        : count < MAX_THEMEN_COUNT
+        ? `${count} Themen gewählt (bis zu ${MAX_THEMEN_COUNT} möglich)`
+        : `${MAX_THEMEN_COUNT} Themen gewählt (Maximum erreicht)`
     return (
       <OnboardingStep
-        title="Wähle 5 Themen"
-        subtitle={
-          remaining > 0
-            ? `Noch ${remaining} ${remaining === 1 ? 'Thema' : 'Themen'} wählen`
-            : 'Super! Du hast deine 5 Themen.'
-        }
+        title="Wähle deine Themen"
+        subtitle={subtitle}
       >
         <div className="flex flex-wrap gap-2 mt-2">
           {THEMEN.map((t) => (
@@ -132,16 +136,16 @@ export default function Onboarding() {
               label={t}
               selected={themen.includes(t)}
               onClick={() => toggleThema(t)}
-              disabled={themen.length >= REQUIRED_THEMEN_COUNT}
+              disabled={themen.length >= MAX_THEMEN_COUNT}
             />
           ))}
         </div>
-        <div className="mt-auto pt-8">
+        <div className="mt-12">
           <Button
             variant="primary"
             fullWidth
             onClick={() => setStep('why')}
-            disabled={themen.length !== REQUIRED_THEMEN_COUNT}
+            disabled={themen.length < MIN_THEMEN_COUNT}
           >
             Weiter
           </Button>

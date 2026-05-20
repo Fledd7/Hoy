@@ -188,11 +188,23 @@ export async function fetchLektion(
   const cached = getCached(modus)
   if (cached) return cached
 
-  const res = await fetch('/api/lektion', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ modus, profil, userInput }),
-  })
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 25_000)
+
+  let res: Response
+  try {
+    res = await fetch('/api/lektion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ modus, profil, userInput }),
+      signal: controller.signal,
+    })
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') throw new Error('timeout')
+    throw err
+  } finally {
+    clearTimeout(timeoutId)
+  }
 
   // Parse JSON regardless of status code so we can distinguish error types.
   // Non-JSON responses (e.g. network proxy errors) are caught below.

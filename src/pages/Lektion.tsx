@@ -138,7 +138,7 @@ type PageState =
   | { kind: 'erzaehl_input' }
   | { kind: 'loading' }
   | { kind: 'ready'; lesson: Lesson }
-  | { kind: 'error' }
+  | { kind: 'error'; reason?: string }
   | { kind: 'spiel_bild_matching' }
   | { kind: 'spiel_wort_paare' }
   | { kind: 'spiel_reihenfolge' }
@@ -201,8 +201,8 @@ export default function Lektion() {
           userInput,
         )
         setPageState({ kind: 'ready', lesson })
-      } catch {
-        setPageState({ kind: 'error' })
+      } catch (err) {
+        setPageState({ kind: 'error', reason: err instanceof Error ? err.message : 'unknown' })
       }
     },
     [navigate],
@@ -454,13 +454,27 @@ export default function Lektion() {
 
   // ─── error ────────────────────────────────────────────────────────────────
   if (pageState.kind === 'error') {
+    const reason = pageState.reason ?? ''
+    const hint =
+      reason === 'timeout'
+        ? 'Die Verbindung hat zu lange gedauert.'
+        : reason === 'gemini_429'
+        ? 'Zu viele Anfragen kurz hintereinander – kurz warten.'
+        : reason === 'missing_api_key'
+        ? 'Konfigurationsfehler – bitte den Entwickler informieren.'
+        : reason
+        ? `Fehlercode: ${reason}`
+        : null
     return (
       <div className={PAGE_WRAP}>
         {backBtn}
         <div className="flex flex-col items-center text-center gap-4 pt-8">
           <p className="text-muted text-base">
-            Die Lektion konnte nicht geladen werden. Versuch es später nochmal.
+            Die Lektion konnte nicht geladen werden.
           </p>
+          {hint && (
+            <p className="text-sm text-[#9B9B9B]">{hint}</p>
+          )}
           <Button
             variant="secondary"
             onClick={() =>
