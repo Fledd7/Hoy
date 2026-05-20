@@ -1,4 +1,4 @@
-import type { UserData, LessonHistoryItem, EnergyMode } from './types';
+import type { UserData, EnergyMode } from './types';
 import { etappeForNiveau } from './etappen';
 import { VOCAB_TRACKING_STORAGE_KEY } from './vocabTracking';
 
@@ -9,7 +9,6 @@ const COMPLETED_LESSONS_KEY = 'hoy_completedLessons';
 const COMPLETED_MODES_KEY = 'hoy_completedModes';
 const LESSON_HISTORY_KEY = 'hoy_lessonHistory';
 const MAX_SEEN_VOCAB = 100;
-const MAX_HISTORY = 30;
 
 function todayStr(): string {
   const d = new Date();
@@ -100,33 +99,6 @@ export function addSeenVocab(items: { es: string; de: string }[]): void {
   }
 }
 
-// ─── Completed Lessons ────────────────────────────────────────────────────────
-
-export function getCompletedLessons(): string[] {
-  try {
-    const raw = localStorage.getItem(COMPLETED_LESSONS_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw) as string[];
-  } catch {
-    return [];
-  }
-}
-
-export function addCompletedLesson(): void {
-  try {
-    const today = todayStr();
-    const existing = getCompletedLessons();
-    if (existing.includes(today)) return;
-    localStorage.setItem(COMPLETED_LESSONS_KEY, JSON.stringify([...existing, today]));
-  } catch {
-    // storage unavailable
-  }
-}
-
-export function hasCompletedToday(): boolean {
-  return getCompletedLessons().includes(todayStr());
-}
-
 // ─── Completed Modes (per-mode daily tracking) ────────────────────────────────
 
 type CompletedModesData = Record<string, EnergyMode[]>
@@ -185,28 +157,3 @@ export function incrementLektionenInEtappe(): { advanced: boolean; newEtappe: 1 
   return { advanced, newEtappe };
 }
 
-// ─── Lesson History ───────────────────────────────────────────────────────────
-
-export function getLessonHistory(): LessonHistoryItem[] {
-  try {
-    const raw = localStorage.getItem(LESSON_HISTORY_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw) as LessonHistoryItem[];
-  } catch {
-    return [];
-  }
-}
-
-export function addLessonHistory(item: LessonHistoryItem): void {
-  try {
-    const existing = getLessonHistory();
-    // One entry per day+mode avoids duplicates when replaying in DEV_MODE
-    const alreadyExists = existing.some(h => h.datum === item.datum && h.modus === item.modus);
-    if (alreadyExists) return;
-    const updated = [...existing, item];
-    const trimmed = updated.slice(Math.max(0, updated.length - MAX_HISTORY));
-    localStorage.setItem(LESSON_HISTORY_KEY, JSON.stringify(trimmed));
-  } catch {
-    // storage unavailable
-  }
-}
