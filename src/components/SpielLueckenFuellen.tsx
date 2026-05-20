@@ -1,17 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { recordVocabAnswer } from '../lib/vocabTracking'
 import { isCloseMatch } from '../lib/stringUtils'
+import { fetchLuecken } from '../lib/api'
+import type { LueckeItem } from '../lib/api'
 import Button from './Button'
 
 interface VocabPair {
   es: string
   de: string
-}
-
-interface Luecke {
-  satz: string
-  loesung: string
-  hilfe_de: string
 }
 
 interface Props {
@@ -21,8 +17,9 @@ interface Props {
 }
 
 export default function SpielLueckenFuellen({ vocab, etappe, onFinish }: Props) {
-  const [luecken, setLuecken] = useState<Luecke[]>([])
+  const [luecken, setLuecken] = useState<LueckeItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [retrying, setRetrying] = useState(false)
   const [error, setError] = useState(false)
   const [index, setIndex] = useState(0)
   const [correct, setCorrect] = useState(0)
@@ -31,20 +28,23 @@ export default function SpielLueckenFuellen({ vocab, etappe, onFinish }: Props) 
   const usedVocab = vocab.slice(0, 5)
 
   useEffect(() => {
-    const controller = new AbortController()
-    fetch('/api/luecken', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ vokabeln: usedVocab, etappe }),
-      signal: controller.signal,
-    })
-      .then(r => r.json())
-      .then((data: { saetze: Luecke[] }) => {
-        setLuecken(data.saetze ?? [])
-        setLoading(false)
-      })
-      .catch(() => { setError(true); setLoading(false) })
-    return () => controller.abort()
+    let mounted = true
+    const load = async () => {
+      try {
+        const data = await fetchLuecken(usedVocab, etappe, () => {
+          if (mounted) setRetrying(true)
+        })
+        if (mounted) {
+          setLuecken(data.saetze ?? [])
+          setLoading(false)
+          setRetrying(false)
+        }
+      } catch {
+        if (mounted) { setError(true); setLoading(false) }
+      }
+    }
+    void load()
+    return () => { mounted = false }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -66,6 +66,9 @@ export default function SpielLueckenFuellen({ vocab, etappe, onFinish }: Props) 
         <div className="h-5 bg-[#E5E2DD] rounded animate-pulse w-4/5" />
         <div className="h-5 bg-[#E5E2DD] rounded animate-pulse w-full" />
         <div className="h-5 bg-[#E5E2DD] rounded animate-pulse w-2/3" />
+        {retrying && (
+          <p className="text-[14px] text-[#6B6B6B] text-center mt-2">Einen Moment noch…</p>
+        )}
       </div>
     )
   }
@@ -131,7 +134,7 @@ function LueckeRunde({
   totalRounds,
   onResult,
 }: {
-  luecke: Luecke
+  luecke: LueckeItem
   roundIndex: number
   totalRounds: number
   vocabEs: string

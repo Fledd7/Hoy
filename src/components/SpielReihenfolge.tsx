@@ -1,12 +1,8 @@
 import { useEffect, useState } from 'react'
 import { recordVocabAnswer } from '../lib/vocabTracking'
+import { fetchReihenfolge } from '../lib/api'
+import type { ReihenfolgeSatz } from '../lib/api'
 import Button from './Button'
-
-
-interface Satz {
-  satz: string
-  uebersetzung: string
-}
 
 interface Props {
   etappe: number
@@ -23,28 +19,32 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 export default function SpielReihenfolge({ etappe, onFinish }: Props) {
-  const [saetze, setSaetze] = useState<Satz[]>([])
+  const [saetze, setSaetze] = useState<ReihenfolgeSatz[]>([])
   const [loading, setLoading] = useState(true)
+  const [retrying, setRetrying] = useState(false)
   const [error, setError] = useState(false)
   const [index, setIndex] = useState(0)
   const [correct, setCorrect] = useState(0)
   const [done, setDone] = useState(false)
 
   useEffect(() => {
-    const controller = new AbortController()
-    fetch('/api/reihenfolge', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ etappe, anzahl: 5 }),
-      signal: controller.signal,
-    })
-      .then(r => r.json())
-      .then((data: { saetze: Satz[] }) => {
-        setSaetze(data.saetze ?? [])
-        setLoading(false)
-      })
-      .catch(() => { setError(true); setLoading(false) })
-    return () => controller.abort()
+    let mounted = true
+    const load = async () => {
+      try {
+        const data = await fetchReihenfolge(etappe, 5, () => {
+          if (mounted) setRetrying(true)
+        })
+        if (mounted) {
+          setSaetze(data.saetze ?? [])
+          setLoading(false)
+          setRetrying(false)
+        }
+      } catch {
+        if (mounted) { setError(true); setLoading(false) }
+      }
+    }
+    void load()
+    return () => { mounted = false }
   }, [etappe])
 
   useEffect(() => {
@@ -59,6 +59,9 @@ export default function SpielReihenfolge({ etappe, onFinish }: Props) {
         <div className="h-5 bg-[#E5E2DD] rounded animate-pulse w-4/5" />
         <div className="h-5 bg-[#E5E2DD] rounded animate-pulse w-full" />
         <div className="h-5 bg-[#E5E2DD] rounded animate-pulse w-2/3" />
+        {retrying && (
+          <p className="text-[14px] text-[#6B6B6B] text-center mt-2">Einen Moment noch…</p>
+        )}
       </div>
     )
   }
@@ -129,7 +132,7 @@ function ReihenfolgeRunde({
   totalRounds,
   onResult,
 }: {
-  satz: Satz
+  satz: ReihenfolgeSatz
   roundIndex: number
   totalRounds: number
   onResult: (correct: boolean) => void
