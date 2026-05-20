@@ -60,9 +60,3 @@ export interface ErzaehlLesson {
 }
 
 export type Lesson = TiredLesson | OkayLesson | FitLesson | ErzaehlLesson;
-
-export interface LessonHistoryItem {
-  datum: string;
-  modus: EnergyMode;
-  content: Lesson;
-}

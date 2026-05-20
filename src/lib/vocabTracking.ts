@@ -103,8 +103,4 @@ export function getVocabForReview(maxCount: number): VocabEntry[] {
   return reviewable.slice(0, maxCount)
 }
 
-export function getAllTrackedVocab(): VocabEntry[] {
-  return loadAll()
-}
-
 export const VOCAB_TRACKING_STORAGE_KEY = VOCAB_TRACKING_KEY
