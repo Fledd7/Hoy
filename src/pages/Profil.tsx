@@ -4,13 +4,13 @@ import { Check } from 'lucide-react'
 import Button from '../components/Button'
 import ThemeChip from '../components/ThemeChip'
 import { getUser, saveUser, resetAll, getSeenVocab, ensureEtappenMigration } from '../lib/storage'
-import { THEMEN, REQUIRED_THEMEN_COUNT } from '../lib/config'
+import { THEMEN, MIN_THEMEN_COUNT, MAX_THEMEN_COUNT } from '../lib/config'
 import { ETAPPEN } from '../lib/etappen'
 import type { UserData } from '../lib/types'
 
 const NIVEAU_LABELS: Record<UserData['niveau'], string> = {
   anfaenger: 'Ich fange ganz neu an',
-  wiedereinsteiger_schule: 'Schule liegt lange zurück',
+  wiedereinsteiger_schule: 'Etwas Schulspanisch ist da',
   wiedereinsteiger_a2: 'Ich verstehe einfache Sätze',
   wiedereinsteiger_b1: 'Ich kann mich unterhalten',
 }
@@ -50,7 +50,7 @@ export default function Profil() {
     setThemen((prev) =>
       prev.includes(thema)
         ? prev.filter((t) => t !== thema)
-        : prev.length < REQUIRED_THEMEN_COUNT
+        : prev.length < MAX_THEMEN_COUNT
         ? [...prev, thema]
         : prev
     )
@@ -58,7 +58,7 @@ export default function Profil() {
   }
 
   function handleSave() {
-    if (!user || themen.length !== REQUIRED_THEMEN_COUNT) return
+    if (!user || themen.length < MIN_THEMEN_COUNT) return
     saveUser({ ...user, themen, why })
     setSaved(true)
   }
@@ -68,7 +68,7 @@ export default function Profil() {
     navigate('/onboarding', { replace: true })
   }
 
-  const canSave = themen.length === REQUIRED_THEMEN_COUNT
+  const canSave = themen.length >= MIN_THEMEN_COUNT
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#FAF7F2] to-[#F5F1EB] max-w-content mx-auto px-5 pt-5 pb-16">
@@ -199,7 +199,7 @@ export default function Profil() {
 
       <section className="mb-8">
         <h2 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3">
-          Deine Themen ({themen.length}/{REQUIRED_THEMEN_COUNT})
+          Deine Themen ({themen.length}/{MAX_THEMEN_COUNT})
         </h2>
         <div className="flex flex-wrap gap-2">
           {THEMEN.map((t) => (
@@ -208,13 +208,13 @@ export default function Profil() {
               label={t}
               selected={themen.includes(t)}
               onClick={() => toggleThema(t)}
-              disabled={themen.length >= REQUIRED_THEMEN_COUNT}
+              disabled={themen.length >= MAX_THEMEN_COUNT}
             />
           ))}
         </div>
-        {themen.length !== REQUIRED_THEMEN_COUNT && (
+        {themen.length < MIN_THEMEN_COUNT && (
           <p className="text-sm text-muted mt-2">
-            Bitte wähle genau {REQUIRED_THEMEN_COUNT} Themen.
+            Bitte wähle mindestens {MIN_THEMEN_COUNT} Themen.
           </p>
         )}
       </section>
@@ -265,7 +265,7 @@ export default function Profil() {
         >
           Alle Daten zurücksetzen
         </Button>
-        <p className="text-center text-[12px] text-[#9B9B9B] mt-8">Hoy v1.1.1</p>
+        <p className="text-center text-[12px] text-[#9B9B9B] mt-8">Hoy v1.1.2</p>
       </div>
     </div>
   )
