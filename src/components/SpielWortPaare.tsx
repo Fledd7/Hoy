@@ -1,5 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { recordVocabAnswer } from '../lib/vocabTracking'
+import { ANFAENGER_VOKABULAR } from '../lib/anfaengerVokabular'
+import type { AnfaengerVokabel } from '../lib/anfaengerVokabular'
 
 interface VocabPair {
   es: string
@@ -27,15 +30,23 @@ function shuffle<T>(arr: T[]): T[] {
   return a
 }
 
-export default function SpielWortPaare({ vocab, onFinish }: Props) {
-  const pairs = vocab.slice(0, 6)
+function pickCards(source: AnfaengerVokabel[]): Card[] {
+  const pairs = source.slice().sort(() => Math.random() - 0.5).slice(0, 6)
+  return shuffle([
+    ...pairs.map((p, i) => ({ id: i * 2,     text: p.es, lang: 'es' as const, pairKey: p.es })),
+    ...pairs.map((p, i) => ({ id: i * 2 + 1, text: p.de, lang: 'de' as const, pairKey: p.es })),
+  ])
+}
 
-  const [cards] = useState<Card[]>(() =>
-    shuffle([
+export default function SpielWortPaare({ vocab }: Props) {
+  const navigate = useNavigate()
+  const [cards, setCards] = useState<Card[]>(() => {
+    const pairs = vocab.slice(0, 6)
+    return shuffle([
       ...pairs.map((p, i) => ({ id: i * 2,     text: p.es, lang: 'es' as const, pairKey: p.es })),
       ...pairs.map((p, i) => ({ id: i * 2 + 1, text: p.de, lang: 'de' as const, pairKey: p.es })),
-    ]),
-  )
+    ])
+  })
 
   const totalPairs = new Set(cards.map(c => c.pairKey)).size
 
@@ -77,13 +88,8 @@ export default function SpielWortPaare({ vocab, onFinish }: Props) {
     }
   }
 
-  useEffect(() => {
-    if (!done) return
-    const t = setTimeout(onFinish, 8000)
-    return () => clearTimeout(t)
-  }, [done, onFinish])
-
-  function handleNochmal() {
+  function handleNochEineRunde() {
+    setCards(pickCards(ANFAENGER_VOKABULAR))
     setRevealed([])
     setMatched([])
     setLocked(false)
@@ -96,16 +102,16 @@ export default function SpielWortPaare({ vocab, onFinish }: Props) {
         <p className="font-serif text-[26px] font-semibold text-text text-center">Alle Paare gefunden!</p>
         <div className="flex flex-col gap-3 w-full max-w-[320px] mt-2">
           <button
-            onClick={handleNochmal}
+            onClick={handleNochEineRunde}
             className="w-full py-4 rounded-[16px] bg-accent text-white text-[15px] font-semibold tap-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            Nochmal
+            Noch eine Runde
           </button>
           <button
-            onClick={onFinish}
+            onClick={() => navigate('/wiederholen')}
             className="w-full py-4 rounded-[16px] border border-accent text-accent text-[15px] font-semibold tap-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            Zurück
+            Zurück zur Übersicht
           </button>
         </div>
       </div>

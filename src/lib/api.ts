@@ -351,10 +351,13 @@ export async function fetchLuecken(
   vokabeln: { es: string; de: string }[],
   etappe: number,
   onRetry?: () => void,
+  forceRefresh?: boolean,
 ): Promise<LueckeResult> {
   const cacheKey = `luecken_${etappe}_${vokabeln.map(v => v.es).sort().join(',')}`
-  const cached = getGameCached(cacheKey)
-  if (cached) return cached as LueckeResult
+  if (!forceRefresh) {
+    const cached = getGameCached(cacheKey)
+    if (cached) return cached as LueckeResult
+  }
 
   const raw = await fetchWithRetry('/api/luecken', { vokabeln, etappe }, onRetry)
   const result = raw as LueckeResult
@@ -375,10 +378,13 @@ export async function fetchReihenfolge(
   etappe: number,
   anzahl: number,
   onRetry?: () => void,
+  forceRefresh?: boolean,
 ): Promise<ReihenfolgeResult> {
   const cacheKey = `reihenfolge_${etappe}_${anzahl}`
-  const cached = getGameCached(cacheKey)
-  if (cached) return cached as ReihenfolgeResult
+  if (!forceRefresh) {
+    const cached = getGameCached(cacheKey)
+    if (cached) return cached as ReihenfolgeResult
+  }
 
   const raw = await fetchWithRetry('/api/reihenfolge', { etappe, anzahl }, onRetry)
   const result = raw as ReihenfolgeResult

@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { recordVocabAnswer } from '../lib/vocabTracking'
+import { ANFAENGER_VOKABULAR } from '../lib/anfaengerVokabular'
 import type { AnfaengerVokabel } from '../lib/anfaengerVokabular'
 
 interface Props {
@@ -7,32 +9,36 @@ interface Props {
   onFinish: () => void
 }
 
-export default function SpielBildMatching({ vocab, onFinish }: Props) {
+interface GameData {
+  rounds: AnfaengerVokabel[]
+  optionSets: string[][]
+}
+
+function pickGameData(source: AnfaengerVokabel[]): GameData {
+  const rounds = source.slice().sort(() => Math.random() - 0.5).slice(0, 8)
+  const optionSets = rounds.map((item, i) => {
+    const distractors = rounds
+      .filter((_, j) => j !== i)
+      .map(v => v.es)
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 2)
+    return [item.es, ...distractors].sort(() => Math.random() - 0.5)
+  })
+  return { rounds, optionSets }
+}
+
+export default function SpielBildMatching({ vocab }: Props) {
+  const navigate = useNavigate()
+  const [gameData, setGameData] = useState<GameData>(() => pickGameData(vocab))
   const [index, setIndex] = useState(0)
   const [selected, setSelected] = useState<number | null>(null)
   const [correct, setCorrect] = useState(0)
   const [done, setDone] = useState(false)
 
-  const rounds = vocab.slice(0, 8)
+  const { rounds, optionSets } = gameData
 
-  const [optionSets] = useState<string[][]>(() =>
-    rounds.map((item, i) => {
-      const distractors = rounds
-        .filter((_, j) => j !== i)
-        .map(v => v.es)
-        .sort(() => Math.random() - 0.5)
-        .slice(0, 2)
-      return [item.es, ...distractors].sort(() => Math.random() - 0.5)
-    }),
-  )
-
-  useEffect(() => {
-    if (!done) return
-    const t = setTimeout(onFinish, 8000)
-    return () => clearTimeout(t)
-  }, [done, onFinish])
-
-  function handleNochmal() {
+  function handleNochEineRunde() {
+    setGameData(pickGameData(ANFAENGER_VOKABULAR))
     setIndex(0)
     setSelected(null)
     setCorrect(0)
@@ -48,16 +54,16 @@ export default function SpielBildMatching({ vocab, onFinish }: Props) {
         </p>
         <div className="flex flex-col gap-3 w-full max-w-[320px] mt-2">
           <button
-            onClick={handleNochmal}
+            onClick={handleNochEineRunde}
             className="w-full py-4 rounded-[16px] bg-accent text-white text-[15px] font-semibold tap-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            Nochmal
+            Noch eine Runde
           </button>
           <button
-            onClick={onFinish}
+            onClick={() => navigate('/wiederholen')}
             className="w-full py-4 rounded-[16px] border border-accent text-accent text-[15px] font-semibold tap-scale focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
-            Zurück
+            Zurück zur Übersicht
           </button>
         </div>
       </div>
